@@ -1,0 +1,16 @@
+[
+  {
+    "id": "inc-seed-0001",
+    "created_at": "2026-06-09T09:55:00.000Z",
+    "updated_at": "2026-06-09T09:55:00.000Z",
+    "title": "External actor probing admin endpoints",
+    "threat_type": "admin_endpoint_probing",
+    "severity": "HIGH",
+    "status": "open",
+    "persona_name": "External Admin Endpoint Hunter",
+    "log_ids": [],
+    "recommended_action": "block_ip",
+    "actions_taken": [],
+    "summary": "Seed incident: external role hit /api/admin/users and /api/admin/config repeatedly."
+  }
+]

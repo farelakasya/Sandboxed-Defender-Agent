@@ -1,0 +1,25 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { ToastProvider } from "@/components/ui/toast";
+
+export const metadata: Metadata = {
+  title: "Sandboxed Defender — Security Tickets",
+  description:
+    "Security ticket queue and incident detail for the AI-driven security platform (demo, mock data).",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // Force dark mode for the security-dashboard aesthetic. The design tokens
+  // also support light mode if `dark` is removed.
+  return (
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-background bg-grid antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
+    </html>
+  );
+}

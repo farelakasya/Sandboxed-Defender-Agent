@@ -1,0 +1,58 @@
+[
+  {
+    "method": "POST",
+    "endpoint": "/api/login",
+    "required_role": "external",
+    "sensitivity": "medium",
+    "description": "Authentication endpoint. Open to external callers; abused for credential stuffing."
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/leads",
+    "required_role": "lead_gen",
+    "sensitivity": "medium",
+    "description": "List sales leads. Intended for lead_gen role."
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/leads",
+    "required_role": "lead_gen",
+    "sensitivity": "medium",
+    "description": "Create a new sales lead. Intended for lead_gen role."
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/clients/:id",
+    "required_role": "rm",
+    "sensitivity": "high",
+    "description": "Fetch a client record. Allowed for rm, sales, admin, auditor; never external."
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/reports/export",
+    "required_role": "auditor",
+    "sensitivity": "critical",
+    "description": "Bulk report export. Restricted to admin or auditor."
+  },
+  {
+    "method": "POST",
+    "endpoint": "/api/admin/reset-user-data",
+    "required_role": "admin",
+    "sensitivity": "critical",
+    "description": "Destructive admin action (dummy). Admin only."
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/users",
+    "required_role": "admin",
+    "sensitivity": "high",
+    "description": "List all users. Admin only."
+  },
+  {
+    "method": "GET",
+    "endpoint": "/api/admin/config",
+    "required_role": "admin",
+    "sensitivity": "high",
+    "description": "Read system configuration. Admin only."
+  }
+]

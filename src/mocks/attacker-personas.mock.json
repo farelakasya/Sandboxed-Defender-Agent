@@ -1,0 +1,52 @@
+[
+  {
+    "persona_name": "External Admin Endpoint Hunter",
+    "goal": "Discover and reach admin-only endpoints from outside the org.",
+    "access_type": "external",
+    "intent": "malicious",
+    "skill_level": "high",
+    "risk_appetite": "high",
+    "target_assets": ["/api/admin/users", "/api/admin/config", "/api/admin/reset-user-data"],
+    "preferred_tactics": ["endpoint enumeration", "forced browsing", "privilege probing"]
+  },
+  {
+    "persona_name": "Credential Stuffing Bot",
+    "goal": "Gain a valid session via reused/leaked credentials.",
+    "access_type": "external",
+    "intent": "malicious",
+    "skill_level": "medium",
+    "risk_appetite": "medium",
+    "target_assets": ["/api/login"],
+    "preferred_tactics": ["credential stuffing", "password spraying", "high-volume login attempts"]
+  },
+  {
+    "persona_name": "Malicious Insider RM",
+    "goal": "Exfiltrate client records beyond their book of business.",
+    "access_type": "internal",
+    "intent": "malicious",
+    "skill_level": "low",
+    "risk_appetite": "medium",
+    "target_assets": ["/api/clients/:id", "/api/leads"],
+    "preferred_tactics": ["data over-collection", "access abuse", "scraping client records"]
+  },
+  {
+    "persona_name": "Report Export Abuser",
+    "goal": "Bulk-export sensitive reporting data for exfiltration.",
+    "access_type": "internal",
+    "intent": "malicious",
+    "skill_level": "medium",
+    "risk_appetite": "high",
+    "target_assets": ["/api/reports/export"],
+    "preferred_tactics": ["bulk export", "report scraping", "data exfiltration"]
+  },
+  {
+    "persona_name": "Stale Account User",
+    "goal": "Use leftover access from a stale account to reach internal data.",
+    "access_type": "stale_account",
+    "intent": "careless",
+    "skill_level": "low",
+    "risk_appetite": "low",
+    "target_assets": ["/api/leads", "/api/clients/:id"],
+    "preferred_tactics": ["dormant account reuse", "lingering access", "low-and-slow access"]
+  }
+]

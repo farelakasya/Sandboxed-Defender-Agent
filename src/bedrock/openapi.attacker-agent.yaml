@@ -1,0 +1,171 @@
+openapi: 3.0.1
+info:
+  title: Attacker Agent Action Group API
+  version: "1.0.0"
+  description: >
+    Tools exposed to the AWS Bedrock Attacker Agent. The agent uses these to
+    read MiroFish-generated personas, inspect the simulated target's endpoint
+    catalog, and issue SIMULATED API requests against the dummy target. No real
+    systems are attacked.
+paths:
+  /personas:
+    get:
+      operationId: getPersonas
+      summary: List all attacker personas
+      description: Returns the full list of MiroFish-derived attacker personas.
+      responses:
+        "200":
+          description: List of personas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttackerPersona"
+  /personas/{persona_name}:
+    get:
+      operationId: getPersonaDetail
+      summary: Get a single persona by name
+      parameters:
+        - name: persona_name
+          in: path
+          required: true
+          description: The persona_name to look up.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A single persona
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttackerPersona"
+        "404":
+          description: Persona not found
+  /simulation-endpoints:
+    get:
+      operationId: listSimulationEndpoints
+      summary: List the simulated target's endpoint catalog
+      description: >
+        Returns the endpoints the attacker can target, including the role each
+        requires and its sensitivity. Use this to plan which requests to send.
+      responses:
+        "200":
+          description: List of simulation endpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimulationEndpoint"
+  /simulate-api-request:
+    post:
+      operationId: simulateApiRequest
+      summary: Send a simulated API request to the dummy target
+      description: >
+        Executes a SIMULATED request. The backend evaluates access control,
+        returns the outcome, and creates a structured security log. This never
+        performs a real action.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulatedApiRequest"
+      responses:
+        "200":
+          description: Simulated response with the created log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatedApiResponse"
+components:
+  schemas:
+    AttackerPersona:
+      type: object
+      required:
+        - persona_name
+        - goal
+        - access_type
+        - intent
+        - skill_level
+        - risk_appetite
+        - target_assets
+        - preferred_tactics
+      properties:
+        persona_name:
+          type: string
+        goal:
+          type: string
+        access_type:
+          type: string
+          enum: [external, internal, admin, stale_account]
+        intent:
+          type: string
+          enum: [curious, careless, malicious]
+        skill_level:
+          type: string
+          enum: [low, medium, high]
+        risk_appetite:
+          type: string
+          enum: [low, medium, high]
+        target_assets:
+          type: array
+          items:
+            type: string
+        preferred_tactics:
+          type: array
+          items:
+            type: string
+    SimulationEndpoint:
+      type: object
+      required: [method, endpoint, required_role, sensitivity, description]
+      properties:
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+        endpoint:
+          type: string
+        required_role:
+          type: string
+          enum: [external, admin, rm, sales, lead_gen, auditor]
+        sensitivity:
+          type: string
+          enum: [low, medium, high, critical]
+        description:
+          type: string
+    SimulatedApiRequest:
+      type: object
+      required: [persona_name, method, endpoint, role, user_agent]
+      properties:
+        persona_name:
+          type: string
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+        endpoint:
+          type: string
+        role:
+          type: string
+          enum: [external, admin, rm, sales, lead_gen, auditor, unknown]
+        user_agent:
+          type: string
+        ip:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+    SimulatedApiResponse:
+      type: object
+      required: [status_code, allowed, reason, log_created, log]
+      properties:
+        status_code:
+          type: integer
+        allowed:
+          type: boolean
+        reason:
+          type: string
+        log_created:
+          type: boolean
+        log:
+          type: object

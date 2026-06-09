@@ -1,0 +1,52 @@
+[
+  {
+    "timestamp": "2026-06-09T10:00:01.000Z",
+    "method": "GET",
+    "path": "/api/leads",
+    "role": "lead_gen",
+    "user_id": "u-lead-001",
+    "ip": "10.0.0.21",
+    "user_agent": "Mozilla/5.0 (internal-portal)",
+    "status_code": 200
+  },
+  {
+    "timestamp": "2026-06-09T10:00:05.000Z",
+    "method": "GET",
+    "path": "/api/admin/users",
+    "role": "external",
+    "user_id": null,
+    "ip": "203.0.113.9",
+    "user_agent": "curl/8.4.0",
+    "status_code": 403
+  },
+  {
+    "timestamp": "2026-06-09T10:00:07.000Z",
+    "method": "POST",
+    "path": "/api/login",
+    "role": "external",
+    "user_id": null,
+    "ip": "198.51.100.44",
+    "user_agent": "python-requests/2.31",
+    "status_code": 401
+  },
+  {
+    "timestamp": "2026-06-09T10:00:09.000Z",
+    "method": "GET",
+    "path": "/api/reports/export",
+    "role": "sales",
+    "user_id": "u-sales-014",
+    "ip": "10.0.0.55",
+    "user_agent": "Mozilla/5.0 (internal-portal)",
+    "status_code": 403
+  },
+  {
+    "timestamp": "2026-06-09T10:00:12.000Z",
+    "method": "GET",
+    "path": "/api/clients/4821",
+    "role": "rm",
+    "user_id": "stale-rm-legacy-007",
+    "ip": "10.0.0.88",
+    "user_agent": "Mozilla/5.0 (internal-portal)",
+    "status_code": 200
+  }
+]

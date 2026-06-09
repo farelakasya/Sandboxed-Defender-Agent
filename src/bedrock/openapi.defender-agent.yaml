@@ -1,0 +1,273 @@
+openapi: 3.0.1
+info:
+  title: Defender Agent Action Group API
+  version: "1.0.0"
+  description: >
+    Tools exposed to the AWS Bedrock Defender Agent. The agent reads recent
+    security logs, classifies threats, opens incidents, and executes SAFE,
+    SIMULATED defender actions. No real firewall, email, or account changes
+    occur.
+paths:
+  /recent-logs:
+    get:
+      operationId: getRecentLogs
+      summary: Read recent security logs
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Max number of logs to return (newest first).
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Recent logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEvent"
+  /classify-log:
+    post:
+      operationId: classifyLog
+      summary: Classify a single log into a threat category
+      description: >
+        Provide either log_id (to look up a stored log) or an inline log object.
+        Returns the threat type, severity, and recommended dummy action.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                log_id:
+                  type: string
+                log:
+                  $ref: "#/components/schemas/LogEvent"
+      responses:
+        "200":
+          description: Classification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Classification"
+  /create-incident:
+    post:
+      operationId: createIncident
+      summary: Open a security incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncidentRequest"
+      responses:
+        "201":
+          description: The created incident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+  /execute-defender-action:
+    post:
+      operationId: executeDefenderAction
+      summary: Execute a SAFE, SIMULATED defender action
+      description: >
+        Records a dummy defensive action (block_ip, rate_limit_ip,
+        notify_admin, flag_user, none). Nothing real happens; the action is
+        stored with simulated=true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteDefenderActionRequest"
+      responses:
+        "201":
+          description: The recorded dummy action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DefenderActionRecord"
+  /defender-state:
+    get:
+      operationId: getDefenderState
+      summary: Get the current simulated defender state
+      responses:
+        "200":
+          description: Current defender state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DefenderState"
+components:
+  schemas:
+    LogEvent:
+      type: object
+      properties:
+        log_id:
+          type: string
+        timestamp:
+          type: string
+        persona_name:
+          type: string
+          nullable: true
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+        endpoint:
+          type: string
+        role:
+          type: string
+          enum: [external, admin, rm, sales, lead_gen, auditor, unknown]
+        user_id:
+          type: string
+          nullable: true
+        ip:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+        status_code:
+          type: integer
+        allowed:
+          type: boolean
+        reason:
+          type: string
+    Classification:
+      type: object
+      properties:
+        threat_type:
+          type: string
+          enum:
+            - admin_endpoint_probing
+            - credential_stuffing_attempt
+            - report_export_abuse
+            - stale_account_abuse
+            - normal_traffic
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        recommended_action:
+          type: string
+          enum: [block_ip, rate_limit_ip, notify_admin, flag_user, none]
+        confidence:
+          type: number
+        rationale:
+          type: string
+        classifier:
+          type: string
+          enum: [rule_based_fallback, bedrock_defender_agent]
+    CreateIncidentRequest:
+      type: object
+      required: [threat_type, severity, recommended_action]
+      properties:
+        title:
+          type: string
+        threat_type:
+          type: string
+          enum:
+            - admin_endpoint_probing
+            - credential_stuffing_attempt
+            - report_export_abuse
+            - stale_account_abuse
+            - normal_traffic
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        persona_name:
+          type: string
+          nullable: true
+        log_ids:
+          type: array
+          items:
+            type: string
+        recommended_action:
+          type: string
+          enum: [block_ip, rate_limit_ip, notify_admin, flag_user, none]
+        summary:
+          type: string
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+        title:
+          type: string
+        threat_type:
+          type: string
+        severity:
+          type: string
+        status:
+          type: string
+          enum: [open, investigating, contained, resolved, dismissed]
+        persona_name:
+          type: string
+          nullable: true
+        log_ids:
+          type: array
+          items:
+            type: string
+        recommended_action:
+          type: string
+        summary:
+          type: string
+    ExecuteDefenderActionRequest:
+      type: object
+      required: [action_type, target]
+      properties:
+        action_type:
+          type: string
+          enum: [block_ip, rate_limit_ip, notify_admin, flag_user, none]
+        target:
+          type: string
+        incident_id:
+          type: string
+        note:
+          type: string
+    DefenderActionRecord:
+      type: object
+      properties:
+        action_id:
+          type: string
+        action_type:
+          type: string
+          enum: [block_ip, rate_limit_ip, notify_admin, flag_user, none]
+        target:
+          type: string
+        executed_at:
+          type: string
+        simulated:
+          type: boolean
+        note:
+          type: string
+    DefenderState:
+      type: object
+      properties:
+        total_logs:
+          type: integer
+        total_incidents:
+          type: integer
+        open_incidents:
+          type: integer
+        blocked_ips:
+          type: array
+          items:
+            type: string
+        rate_limited_ips:
+          type: array
+          items:
+            type: string
+        flagged_users:
+          type: array
+          items:
+            type: string
+        admin_notifications:
+          type: integer
