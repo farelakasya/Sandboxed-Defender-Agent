@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>talos.edu — Red/Blue Team Simulation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <style>
+    :root {
+      --bg:          #0d0f11;
+      --bg2:         #141618;
+      --bg3:         #1b1d20;
+      --border:      #2a2c30;
+      --border2:     #343639;
+      --text:        #e8eaed;
+      --text2:       #9aa0a8;
+      --text3:       #5c6370;
+      --red:         #e24b4a;
+      --red-bg:      rgba(226,75,74,.12);
+      --red-border:  rgba(226,75,74,.3);
+      --blue:        #378add;
+      --blue-bg:     rgba(55,138,221,.12);
+      --blue-border: rgba(55,138,221,.3);
+      --green:       #1d9e75;
+      --green-bg:    rgba(29,158,117,.12);
+      --green-border:rgba(29,158,117,.3);
+      --warn:        #ef9f27;
+      --warn-bg:     rgba(239,159,39,.12);
+      --warn-border: rgba(239,159,39,.3);
+      --radius:      8px;
+      --radius-lg:   12px;
+      --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono:        'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── TOPNAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand .icon-wrap {
+      width: 28px; height: 28px;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-brand .icon-wrap i { color: var(--red); font-size: 16px; }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+    .nb-idle    { background: var(--bg3); color: var(--text2);  border-color: var(--border2); }
+    .nb-running { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+    .nb-done    { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text3);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 4px 12px;
+      margin-bottom: 18px;
+    }
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .hero h1 span { color: var(--red); }
+    .hero p {
+      font-size: 14px;
+      color: var(--text2);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── METRICS ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .metric {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .metric-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .metric-val { font-size: 28px; font-weight: 600; }
+    .mv-red   { color: var(--red); }
+    .mv-blue  { color: var(--blue); }
+    .mv-green { color: var(--green); }
+    .mv-warn  { color: var(--warn); }
+
+    /* ── SCORE BAR ── */
+    .score-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .score-label { font-size: 12px; font-weight: 500; width: 80px; flex-shrink: 0; }
+    .score-label.red  { color: var(--red);  text-align: right; }
+    .score-label.blue { color: var(--blue); }
+    .score-track {
+      flex: 1;
+      height: 8px;
+      border-radius: 99px;
+      overflow: hidden;
+      display: flex;
+      background: var(--bg3);
+    }
+    .score-r { background: var(--red);  transition: width .5s ease; }
+    .score-b { background: var(--blue); transition: width .5s ease; }
+
+    /* ── SECTION TITLE ── */
+    .sec-hd {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+
+    /* ── ATTACK GRID ── */
+    .attack-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .atk-chip {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      user-select: none;
+    }
+    .atk-chip:hover { background: var(--bg3); border-color: var(--border2); }
+    .atk-chip.selected {
+      background: var(--red-bg);
+      border-color: var(--red-border);
+    }
+    .atk-chip i {
+      font-size: 20px;
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text2);
+    }
+    .atk-chip.selected i { color: var(--red); }
+    .atk-chip span { font-size: 10px; color: var(--text2); line-height: 1.3; display: block; }
+    .atk-chip.selected span { color: var(--red); }
+
+    /* ── TARGET PILLS ── */
+    .target-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .target-pill {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .target-pill:hover { background: var(--bg3); }
+    .target-pill.active {
+      background: var(--red-bg);
+      border-color: var(--red-border);
+      color: var(--red);
+    }
+
+    /* ── THREAT LIST ── */
+    .threat-list {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .threat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .threat-row:last-child { border-bottom: none; }
+    .threat-name { flex: 1; font-weight: 500; color: var(--text); }
+    .threat-status {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+    .ts-pending  { background: var(--bg3);       color: var(--text3);  border-color: var(--border); }
+    .ts-active   { background: var(--warn-bg);   color: var(--warn);   border-color: var(--warn-border); }
+    .ts-blocked  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-border); }
+    .ts-breached { background: var(--red-bg);    color: var(--red);    border-color: var(--red-border); }
+
+    /* ── CONTROLS ── */
+    .controls { display: flex; gap: 10px; margin-bottom: 24px; }
+    .btn-launch {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--red-border);
+      background: var(--red-bg);
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: opacity .15s;
+    }
+    .btn-launch:hover { opacity: .85; }
+    .btn-launch:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-reset {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+    }
+    .btn-reset:hover { background: var(--bg3); }
+
+    /* ── LOG PANELS ── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-header.red-hd  { background: rgba(226,75,74,.08); }
+    .panel-header.blue-hd { background: rgba(55,138,221,.08); }
+    .panel-title { font-size: 13px; font-weight: 600; }
+    .panel-sub   { font-size: 11px; color: var(--text3); margin-left: auto; }
+    .panel-body  {
+      padding: 10px 14px;
+      height: 230px;
+      overflow-y: auto;
+      background: var(--bg);
+      scroll-behavior: smooth;
+    }
+
+    /* custom scrollbar */
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time {
+      color: var(--text3);
+      min-width: 40px;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding-top: 2px;
+      flex-shrink: 0;
+    }
+    .log-msg  { color: var(--text2); flex: 1; }
+    .log-msg strong { color: var(--text); font-weight: 600; }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .dot-red  { background: var(--red); }
+    .dot-blue { background: var(--blue); }
+    .dot-warn { background: var(--warn); }
+    .dot-ok   { background: var(--green); }
+
+    /* ── FOOTER ACTIONS ── */
+    .footer-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .action-btn {
+      font-size: 12px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 16px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn:hover { background: var(--bg2); border-color: var(--border2); color: var(--text); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .attack-grid { grid-template-columns: repeat(3, 1fr); }
+      .panels { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-brand">
+    <div class="icon-wrap"><i class="ti ti-shield-bolt"></i></div>
+    CyberSim
+  </a>
+  <div class="nav-right">
+    <span style="font-size:12px;color:var(--text3)">talos.edu vs delos.edu</span>
+    <span class="nav-badge nb-idle" id="sim-status">Idle</span>
+  </div>
+</nav>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag"><i class="ti ti-lock" style="font-size:12px"></i>Educational simulation</div>
+    <h1><span>Red / Blue</span> Team Simulation</h1>
+    <p>Live attack and defense scenario for the <strong style="color:var(--text)">talos.edu</strong> network topology. Select vectors and targets, then launch to watch both teams respond in real time.</p>
+  </div>
+
+  <!-- METRICS -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Attacks launched</div>
+      <div class="metric-val mv-red" id="m-attacks">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Defenses triggered</div>
+      <div class="metric-val mv-blue" id="m-defenses">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Threats blocked</div>
+      <div class="metric-val mv-green" id="m-blocked">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Breaches</div>
+      <div class="metric-val mv-warn" id="m-breaches">0</div>
+    </div>
+  </div>
+
+  <!-- SCORE BAR -->
+  <div class="score-wrap">
+    <span class="score-label red" id="lbl-red">Red — 50%</span>
+    <div class="score-track">
+      <div class="score-r" id="score-red" style="width:50%"></div>
+      <div class="score-b" id="score-blue" style="width:50%"></div>
+    </div>
+    <span class="score-label blue" id="lbl-blue">Blue — 50%</span>
+  </div>
+
+  <!-- ATTACK VECTORS -->
+  <div class="sec-hd">Select attack vectors</div>
+  <div class="attack-grid" id="atk-grid">
+    <div class="atk-chip selected" data-key="recon">
+      <i class="ti ti-radar"></i><span>Network recon</span>
+    </div>
+    <div class="atk-chip selected" data-key="dns">
+      <i class="ti ti-world-cog"></i><span>DNS spoofing</span>
+    </div>
+    <div class="atk-chip selected" data-key="mail">
+      <i class="ti ti-mail-exclamation"></i><span>SMTP relay</span>
+    </div>
+    <div class="atk-chip selected" data-key="fw">
+      <i class="ti ti-firewall"></i><span>Firewall bypass</span>
+    </div>
+    <div class="atk-chip selected" data-key="web">
+      <i class="ti ti-world-www"></i><span>Web exploit</span>
+    </div>
+  </div>
+
+  <!-- TARGETS -->
+  <div class="sec-hd">Select targets</div>
+  <div class="target-bar" id="target-bar">
+    <span class="target-pill active" data-t="R1">R1 (gateway)</span>
+    <span class="target-pill active" data-t="R3">R3 (DMZ router)</span>
+    <span class="target-pill active" data-t="dns">DNS server</span>
+    <span class="target-pill active" data-t="mail">Mail server</span>
+    <span class="target-pill active" data-t="web">Web server</span>
+    <span class="target-pill active" data-t="fw">Firewall</span>
+  </div>
+
+  <!-- THREAT STATUS LIST -->
+  <div class="threat-list" id="threat-list">
+    <div class="threat-row">
+      <i class="ti ti-dots" style="color:var(--text3);font-size:15px"></i>
+      <span class="threat-name" style="color:var(--text3);font-weight:400">No active threats — launch simulation to begin</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn-launch" id="btn-start" onclick="startSim()">
+      <i class="ti ti-player-play"></i> Launch simulation
+    </button>
+    <button class="btn-reset" onclick="resetSim()">
+      <i class="ti ti-refresh"></i> Reset
+    </button>
+  </div>
+
+  <!-- LOG PANELS -->
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header red-hd">
+        <i class="ti ti-sword" style="color:var(--red);font-size:17px"></i>
+        <span class="panel-title" style="color:var(--red)">Red team — attacker</span>
+        <span class="panel-sub">delos.edu agent</span>
+      </div>
+      <div class="panel-body" id="red-log">
+        <div class="log-entry">
+          <span class="dot dot-red"></span>
+          <span class="log-time">--:--</span>
+          <span class="log-msg">Waiting for simulation to start...</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header blue-hd">
+        <i class="ti ti-shield-check" style="color:var(--blue);font-size:17px"></i>
+        <span class="panel-title" style="color:var(--blue)">Blue team — defender</span>
+        <span class="panel-sub">talos.edu agent</span>
+      </div>
+      <div class="panel-body" id="blue-log">
+        <div class="log-entry">
+          <span class="dot dot-blue"></span>
+          <span class="log-time">--:--</span>
+          <span class="log-msg">Monitoring all systems — standby...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER ACTIONS -->
+  <div class="footer-actions">
+    <button class="action-btn" onclick="alert('Opens detailed report view')">
+      <i class="ti ti-report-analytics"></i> Generate full report
+    </button>
+    <button class="action-btn" onclick="alert('Opens R3 firewall fix guide')">
+      <i class="ti ti-firewall"></i> Fix R3 firewall
+    </button>
+    <button class="action-btn" onclick="alert('Opens Postfix hardening steps')">
+      <i class="ti ti-mail-lock"></i> Harden SMTP
+    </button>
+    <button class="action-btn" onclick="alert('Opens iptables rule generator')">
+      <i class="ti ti-terminal-2"></i> Write iptables rules
+    </button>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+  let running = false;
+  let attacks = 0, defenses = 0, blocked = 0, breaches = 0;
+  let simTime = 0;
+
+  const atkKeys = {
+    recon: 'Network recon',
+    dns:   'DNS spoofing',
+    mail:  'SMTP relay',
+    fw:    'Firewall bypass',
+    web:   'Web exploit',
+  };
+
+  const redScenarios = {
+    recon: [
+      "Initiating port scan on 86.107.32.0/24 — mapping live hosts",
+      "Discovered open ports: 22(SSH), 25(SMTP), 53(DNS), 80(HTTP) on targets",
+      "Running OS fingerprinting on R1 (86.107.32.1) — Linux kernel detected",
+      "Banner grabbing on SMTP server — Postfix version exposed",
+      "Traceroute to talos.edu reveals R1→R3→R2 backbone topology",
+    ],
+    dns: [
+      "Attempting DNS cache poisoning on bind9 server (86.107.125.x)",
+      "Crafting spoofed DNS response — redirecting mail.talos.edu to rogue IP",
+      "DNS amplification probe: sending forged ANY queries via R3",
+      "Zone transfer attempt on talos.edu — querying AXFR records",
+      "Poisoned TTL injected — clients may cache malicious A record for 300s",
+    ],
+    mail: [
+      "Testing SMTP open relay — RCPT TO: external@delos.edu via mail server",
+      "Sending phishing email: 'IT security alert' to client1@talos.edu",
+      "SMTP VRFY enumeration — probing valid user accounts",
+      "Attempting STARTTLS downgrade — forcing plaintext SMTP session",
+      "Mass relay attempt: queueing 50 spoofed messages via postfix relay",
+    ],
+    fw: [
+      "Probing R3 firewall — empty iptables chain detected (no rules!)",
+      "Attempting port knocking bypass on R1 — testing sequence 7000,8000,9000",
+      "Fragmented packet injection to evade stateless firewall inspection",
+      "Testing ICMP tunnel through R3 — data exfiltration via ping payloads",
+      "IPv6 bypass attempt — checking dual-stack misconfiguration on routers",
+    ],
+    web: [
+      "SQL injection probe on localweb HTTP server — testing login form",
+      "Directory traversal: GET /../../../../etc/passwd on web server",
+      "Sending oversized HTTP header — testing buffer overflow on web daemon",
+      "XSS payload injected into contact form — harvesting session cookies",
+      "Brute-forcing /admin endpoint — 100 attempts/min with common passwords",
+    ],
+  };
+
+  const blueResponses = {
+    recon: [
+      "IDS alert: port scan detected from 10.0.x.x — rate-limiting source IP",
+      "Snort rule triggered: SYN flood pattern, blocking at R1 ingress ACL",
+      "OS fingerprint probe detected — deploying honeypot response",
+      "Banner hiding applied — SMTP now returns generic service string",
+      "Topology obfuscation active — selective ICMP TTL manipulation enabled",
+    ],
+    dns: [
+      "DNSSEC validation active — rejecting unsigned DNS responses",
+      "Cache poisoning attempt blocked — source port randomization verified",
+      "DNS amplification detected — rate-limiting ANY queries at resolver",
+      "Zone transfer denied — AXFR restricted to authorised secondaries only",
+      "Alert: rogue A record detected — cache flushed, clients notified",
+    ],
+    mail: [
+      "Open relay test blocked — relay access denied for external domain",
+      "Phishing email quarantined — SPF check failed for delos.edu sender",
+      "SMTP VRFY disabled — user enumeration blocked by policy",
+      "STARTTLS enforced — downgrade attempt rejected, connection dropped",
+      "Rate limiting engaged — SMTP relay flood blocked, postmaster alerted",
+    ],
+    fw: [
+      "CRITICAL: empty firewall on R3 detected — pushing iptables DROP rules now",
+      "Port knocking sequence logged — invalid sequence flagged, IP blocked",
+      "Fragmented packet reassembly enforced — evasion attempt neutralised",
+      "ICMP rate-limit applied — ping tunnel exfil attempt blocked on R3",
+      "IPv6 disabled on unused interfaces — dual-stack attack surface reduced",
+    ],
+    web: [
+      "WAF rule fired: SQL injection pattern blocked — attacker IP banned",
+      "Traversal attempt blocked — chroot jail enforced on web server",
+      "HTTP header overflow dropped — connection reset at load balancer",
+      "XSS payload sanitised — CSP policy blocked script execution",
+      "Brute-force lockout: /admin blocked after 10 failures — CAPTCHA enforced",
+    ],
+  };
+
+  function fmtTime(s) {
+    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function appendLog(panelId, html, dotClass) {
+    const panel = document.getElementById(panelId);
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="dot ${dotClass}"></span><span class="log-time">${fmtTime(simTime)}</span><span class="log-msg">${html}</span>`;
+    panel.appendChild(entry);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function updateMetrics() {
+    document.getElementById('m-attacks').textContent  = attacks;
+    document.getElementById('m-defenses').textContent = defenses;
+    document.getElementById('m-blocked').textContent  = blocked;
+    document.getElementById('m-breaches').textContent = breaches;
+    const total  = blocked + breaches || 1;
+    const blueW  = Math.round((blocked / total) * 100);
+    const redW   = 100 - blueW;
+    document.getElementById('score-red').style.width  = redW  + '%';
+    document.getElementById('score-blue').style.width = blueW + '%';
+    document.getElementById('lbl-red').textContent  = `Red — ${redW}%`;
+    document.getElementById('lbl-blue').textContent = `Blue — ${blueW}%`;
+  }
+
+  function getSelectedAttacks() {
+    return [...document.querySelectorAll('.atk-chip.selected')].map(c => c.dataset.key);
+  }
+  function getSelectedTargets() {
+    return [...document.querySelectorAll('.target-pill.active')].map(c => c.dataset.t);
+  }
+
+  function buildThreatList(keys) {
+    const list = document.getElementById('threat-list');
+    list.innerHTML = '';
+    keys.forEach(k => {
+      const row = document.createElement('div');
+      row.className = 'threat-row';
+      row.innerHTML = `
+        <i class="ti ti-alert-triangle" style="color:var(--text3);font-size:15px"></i>
+        <span class="threat-name">${atkKeys[k]}</span>
+        <span class="threat-status ts-pending" id="ts-${k}">Pending</span>`;
+      list.appendChild(row);
+    });
+  }
+
+  function setThreatStatus(key, status) {
+    const el = document.getElementById('ts-' + key);
+    if (!el) return;
+    const map = {
+      active:  ['ts-active',  'Active'],
+      blocked: ['ts-blocked', 'Blocked'],
+      breached:['ts-breached','Breached'],
+    };
+    el.className = 'threat-status ' + (map[status]?.[0] ?? 'ts-pending');
+    el.textContent = map[status]?.[1] ?? 'Pending';
+  }
+
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function runAgentTurn(attackKey, targets) {
+    const target  = targets[Math.floor(Math.random() * targets.length)] || 'R1';
+    const redMsg  = redScenarios[attackKey][Math.floor(Math.random() * 5)];
+    const blueMsg = blueResponses[attackKey][Math.floor(Math.random() * 5)];
+
+    setThreatStatus(attackKey, 'active');
+    appendLog('red-log', `<strong>[${atkKeys[attackKey]}]</strong> → ${target}: ${redMsg}`, 'dot-red');
+    attacks++;
+    updateMetrics();
+
+    await delay(900 + Math.random() * 600);
+
+    defenses++;
+    if (Math.random() < 0.72) {
+      appendLog('blue-log', `<strong>[Blocked]</strong> ${blueMsg}`, 'dot-ok');
+      blocked++;
+      setThreatStatus(attackKey, 'blocked');
+    } else {
+      appendLog('blue-log', `<strong>[Alert]</strong> ${blueMsg} — partial breach detected!`, 'dot-warn');
+      breaches++;
+      setThreatStatus(attackKey, 'breached');
+      appendLog('red-log', `<strong>[Success]</strong> Partial access on ${target} — escalating...`, 'dot-warn');
+    }
+    updateMetrics();
+  }
+
+  async function runSimRound() {
+    const selAtks = getSelectedAttacks();
+    const selTgts = getSelectedTargets();
+    if (!selAtks.length || !selTgts.length) return;
+
+    buildThreatList(selAtks);
+    const shuffled = [...selAtks].sort(() => Math.random() - .5);
+    for (const atk of shuffled) {
+      if (!running) break;
+      simTime += Math.floor(5 + Math.random() * 10);
+      await runAgentTurn(atk, selTgts);
+      await delay(400);
+    }
+    appendLog('red-log',  '<strong>[Round complete]</strong> Regrouping — preparing next wave...', 'dot-red');
+    appendLog('blue-log', '<strong>[Summary]</strong> Round reviewed — updating firewall rules and IDS signatures', 'dot-blue');
+    simTime += 15;
+    updateMetrics();
+  }
+
+  function setStatus(cls, label) {
+    const el = document.getElementById('sim-status');
+    el.className = 'nav-badge ' + cls;
+    el.textContent = label;
+  }
+
+  async function startSim() {
+    if (running) return;
+    running = true;
+    document.getElementById('btn-start').disabled = true;
+    setStatus('nb-running', 'Running');
+
+    document.getElementById('red-log').innerHTML  = '';
+    document.getElementById('blue-log').innerHTML = '';
+    appendLog('red-log',  '<strong>[Init]</strong> Red team agent online — delos.edu attack node ready', 'dot-red');
+    appendLog('blue-log', '<strong>[Init]</strong> Blue team agent online — talos.edu IDS/IPS systems active', 'dot-blue');
+
+    for (let round = 0; running && round < 3; round++) {
+      await delay(600);
+      await runSimRound();
+      await delay(800);
+    }
+
+    running = false;
+    document.getElementById('btn-start').disabled = false;
+    setStatus('nb-done', 'Complete');
+    appendLog('red-log',  '<strong>[Done]</strong> Simulation complete — awaiting debrief', 'dot-red');
+    appendLog('blue-log', `<strong>[Done]</strong> Simulation complete — ${blocked} threats neutralised, ${breaches} breach(es) logged`, 'dot-blue');
+  }
+
+  function resetSim() {
+    running = false;
+    attacks = defenses = blocked = breaches = simTime = 0;
+    document.getElementById('btn-start').disabled = false;
+    setStatus('nb-idle', 'Idle');
+    document.getElementById('red-log').innerHTML  = '<div class="log-entry"><span class="dot dot-red"></span><span class="log-time">--:--</span><span class="log-msg">Waiting for simulation to start...</span></div>';
+    document.getElementById('blue-log').innerHTML = '<div class="log-entry"><span class="dot dot-blue"></span><span class="log-time">--:--</span><span class="log-msg">Monitoring all systems — standby...</span></div>';
+    document.getElementById('threat-list').innerHTML = '<div class="threat-row"><i class="ti ti-dots" style="color:var(--text3);font-size:15px"></i><span class="threat-name" style="color:var(--text3);font-weight:400">No active threats — launch simulation to begin</span></div>';
+    document.getElementById('score-red').style.width  = '50%';
+    document.getElementById('score-blue').style.width = '50%';
+    document.getElementById('lbl-red').textContent  = 'Red — 50%';
+    document.getElementById('lbl-blue').textContent = 'Blue — 50%';
+    updateMetrics();
+  }
+
+  document.getElementById('atk-grid').addEventListener('click', e => {
+    const chip = e.target.closest('.atk-chip');
+    if (chip && !running) chip.classList.toggle('selected');
+  });
+  document.getElementById('target-bar').addEventListener('click', e => {
+    const pill = e.target.closest('.target-pill');
+    if (pill && !running) pill.classList.toggle('active');
+  });
+</script>
+</body>
+</html>

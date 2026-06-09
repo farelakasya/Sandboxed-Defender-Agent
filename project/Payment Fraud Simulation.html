@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FraudSim — Payment Fraud Detection</title>
+
+  <template id="__bundler_thumbnail" data-bg-color="#0d0f11">
+    <svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+      <!-- Shield icon -->
+      <rect width="120" height="80" fill="#0d0f11"/>
+      <!-- Red shield -->
+      <path d="M60 18 L76 25 L76 44 Q76 56 60 63 Q44 56 44 44 L44 25 Z" fill="none" stroke="#e24b4a" stroke-width="2.5"/>
+      <!-- Bolt inside -->
+      <path d="M63 31 L57 42 L61 42 L57 53 L66 39 L62 39 Z" fill="#e24b4a"/>
+      <!-- Two log lines -->
+      <rect x="30" y="68" width="18" height="2" rx="1" fill="#e24b4a" opacity=".7"/>
+      <rect x="52" y="68" width="28" height="2" rx="1" fill="#378add" opacity=".7"/>
+      <rect x="84" y="68" width="8" height="2" rx="1" fill="#1d9e75" opacity=".7"/>
+    </svg>
+  </template>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <style>
+    :root {
+      --bg:           #0d0f11;
+      --bg2:          #141618;
+      --bg3:          #1b1d20;
+      --border:       #2a2c30;
+      --border2:      #343639;
+      --text:         #e8eaed;
+      --text2:        #9aa0a8;
+      --text3:        #5c6370;
+      --red:          #e24b4a;
+      --red-bg:       rgba(226,75,74,.12);
+      --red-border:   rgba(226,75,74,.3);
+      --blue:         #378add;
+      --blue-bg:      rgba(55,138,221,.12);
+      --blue-border:  rgba(55,138,221,.3);
+      --green:        #1d9e75;
+      --green-bg:     rgba(29,158,117,.12);
+      --green-border: rgba(29,158,117,.3);
+      --warn:         #ef9f27;
+      --warn-bg:      rgba(239,159,39,.12);
+      --warn-border:  rgba(239,159,39,.3);
+      --radius:       8px;
+      --radius-lg:    12px;
+      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono:         'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── TOPNAV ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 52px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-brand .icon-wrap {
+      width: 28px; height: 28px;
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-brand .icon-wrap i { color: var(--red); font-size: 16px; }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
+    .nav-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+    .nb-idle    { background: var(--bg3);      color: var(--text2); border-color: var(--border2); }
+    .nb-running { background: var(--warn-bg);  color: var(--warn);  border-color: var(--warn-border); }
+    .nb-done    { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center;
+      padding: 40px 0 32px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text3);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 4px 12px;
+      margin-bottom: 18px;
+    }
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .hero h1 span { color: var(--red); }
+    .hero p {
+      font-size: 14px;
+      color: var(--text2);
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* ── METRICS ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .metric {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .metric-label { font-size: 11px; color: var(--text3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .04em; }
+    .metric-val { font-size: 28px; font-weight: 600; }
+    .mv-red   { color: var(--red); }
+    .mv-blue  { color: var(--blue); }
+    .mv-green { color: var(--green); }
+    .mv-warn  { color: var(--warn); }
+
+    /* ── SCORE BAR ── */
+    .score-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .score-label { font-size: 12px; font-weight: 500; width: 96px; flex-shrink: 0; }
+    .score-label.red  { color: var(--red);  text-align: right; }
+    .score-label.blue { color: var(--blue); }
+    .score-track {
+      flex: 1;
+      height: 8px;
+      border-radius: 99px;
+      overflow: hidden;
+      display: flex;
+      background: var(--bg3);
+    }
+    .score-r { background: var(--red);  transition: width .5s ease; }
+    .score-b { background: var(--blue); transition: width .5s ease; }
+
+    /* ── SECTION TITLE ── */
+    .sec-hd {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+
+    /* ── ATTACK GRID ── */
+    .attack-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .atk-chip {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      user-select: none;
+    }
+    .atk-chip:hover { background: var(--bg3); border-color: var(--border2); }
+    .atk-chip.selected { background: var(--red-bg); border-color: var(--red-border); }
+    .atk-chip i { font-size: 20px; display: block; margin-bottom: 5px; color: var(--text2); }
+    .atk-chip.selected i { color: var(--red); }
+    .atk-chip .chip-name  { font-size: 10px; color: var(--text2); line-height: 1.3; display: block; }
+    .atk-chip.selected .chip-name { color: var(--red); }
+    .atk-chip .chip-owasp { font-size: 9px; color: var(--text3); display: block; margin-top: 3px; font-family: var(--mono); }
+    .atk-chip.selected .chip-owasp { color: rgba(226,75,74,.55); }
+
+    /* ── TARGET PILLS ── */
+    .target-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .target-pill {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .target-pill:hover { background: var(--bg3); }
+    .target-pill.active { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+
+    /* ── THREAT LIST ── */
+    .threat-list {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .threat-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .threat-row:last-child { border-bottom: none; }
+    .threat-name { flex: 1; font-weight: 500; color: var(--text); }
+    .threat-status {
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+    .ts-pending  { background: var(--bg3);       color: var(--text3);  border-color: var(--border); }
+    .ts-active   { background: var(--warn-bg);   color: var(--warn);   border-color: var(--warn-border); }
+    .ts-blocked  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-border); }
+    .ts-breached { background: var(--red-bg);    color: var(--red);    border-color: var(--red-border); }
+
+    /* ── OWASP + SEVERITY BADGES ── */
+    .owasp-badge {
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--mono);
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--blue-bg);
+      color: var(--blue);
+      border: 1px solid var(--blue-border);
+      flex-shrink: 0;
+    }
+    .sev-badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .sev-high { background: var(--red-bg);  color: var(--red);  border: 1px solid var(--red-border); }
+    .sev-med  { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+
+    /* ── CONTROLS ── */
+    .controls { display: flex; gap: 10px; margin-bottom: 24px; }
+    .btn-launch {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--red-border);
+      background: var(--red-bg);
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: opacity .15s;
+    }
+    .btn-launch:hover { opacity: .85; }
+    .btn-launch:disabled { opacity: .35; cursor: not-allowed; }
+    .btn-reset {
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+    }
+    .btn-reset:hover { background: var(--bg3); }
+
+    /* ── LOG PANELS ── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .panel { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-header.red-hd  { background: rgba(226,75,74,.08); }
+    .panel-header.blue-hd { background: rgba(55,138,221,.08); }
+    .panel-title { font-size: 13px; font-weight: 600; }
+    .panel-sub   { font-size: 11px; color: var(--text3); margin-left: auto; }
+    .panel-body  {
+      padding: 10px 14px;
+      height: 230px;
+      overflow-y: auto;
+      background: var(--bg);
+      scroll-behavior: smooth;
+    }
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+
+    .log-entry {
+      display: flex;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time {
+      color: var(--text3);
+      min-width: 40px;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding-top: 2px;
+      flex-shrink: 0;
+    }
+    .log-msg  { color: var(--text2); flex: 1; }
+    .log-msg strong { color: var(--text); font-weight: 600; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .dot-red  { background: var(--red); }
+    .dot-blue { background: var(--blue); }
+    .dot-warn { background: var(--warn); }
+    .dot-ok   { background: var(--green); }
+
+    /* ── FOOTER ACTIONS ── */
+    .footer-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .action-btn {
+      font-size: 12px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 16px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .action-btn:hover { background: var(--bg2); border-color: var(--border2); color: var(--text); }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.76);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 780px;
+      max-height: 88vh;
+      overflow-y: auto;
+      transform: translateY(8px);
+      transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal::-webkit-scrollbar { width: 4px; }
+    .modal::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg2);
+      z-index: 1;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-close {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text2);
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .modal-close:hover { background: var(--bg3); color: var(--text); }
+    .modal-body { padding: 20px; }
+
+    /* ── REPORT STYLES ── */
+    .report-note {
+      font-size: 12px;
+      color: var(--text2);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .report-note .warn-line { color: var(--warn); margin-top: 4px; display: block; }
+    .vstats-top {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .vstats-bot {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .vstat {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      text-align: center;
+      position: relative;
+    }
+    .vstat-num  { font-size: 38px; font-weight: 700; line-height: 1; color: var(--text); }
+    .vstat-lbl  { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); margin-top: 4px; }
+    .vstat-dot  {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .vsub {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .vsub-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); }
+    .vsub-num  { font-size: 22px; font-weight: 700; }
+
+    /* ── DONUT CHARTS ── */
+    .donut-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .donut-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .donut-card-title { font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+    .donut-inner { display: flex; align-items: center; gap: 16px; }
+    .donut-legend { font-size: 11px; flex: 1; }
+    .dl-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2.5px 0;
+    }
+    .dl-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .dl-name   { flex: 1; color: var(--text2); }
+    .dl-count  { color: var(--text); font-weight: 600; font-family: var(--mono); min-width: 18px; text-align: right; }
+    .dl-total-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 2px;
+      border-top: 1px solid var(--border);
+      margin-top: 3px;
+    }
+    .dl-total-lbl { flex: 1; font-weight: 700; font-size: 11px; color: var(--text); }
+    .dl-total-num { font-weight: 700; font-family: var(--mono); font-size: 11px; color: var(--text); }
+
+    /* ── OWASP TABLE ── */
+    .owasp-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .owasp-tbl th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text3);
+      border-bottom: 1px solid var(--border2);
+    }
+    .owasp-tbl td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .owasp-tbl tr:last-child td { border-bottom: none; }
+    .owasp-tbl tr.hl td { background: rgba(239,159,39,.05); }
+    .vuln-title  { color: var(--text); font-weight: 500; margin-bottom: 2px; }
+    .vuln-detail { color: var(--text3); font-size: 11px; }
+    .cnt { color: var(--text); font-weight: 700; font-family: var(--mono); }
+
+    /* ── REMEDIATION ── */
+    .remed-list { list-style: none; padding: 0; }
+    .remed-item {
+      display: flex;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .remed-item:last-child { border-bottom: none; }
+    .remed-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--blue-bg);
+      color: var(--blue);
+      font-size: 10px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      border: 1px solid var(--blue-border);
+    }
+    .remed-text { color: var(--text2); line-height: 1.5; }
+    .remed-text strong { color: var(--text); display: block; margin-bottom: 2px; }
+    .case-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid var(--green-border);
+      margin-top: 4px;
+    }
+
+    /* ── RULE EDITOR ── */
+    .rule-editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .re-btn {
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background .15s, border-color .15s, color .15s;
+      font-family: var(--font);
+    }
+    .re-btn:hover { background: var(--bg2); border-color: var(--border2); color: var(--text); }
+    .re-btn.primary { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+    .re-btn.primary:hover { opacity: .85; }
+    .re-btn.danger  { background: var(--red-bg);  border-color: var(--red-border);  color: var(--red);  }
+    .re-btn.success { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+    .re-btn.warn    { background: var(--warn-bg);  border-color: var(--warn-border);  color: var(--warn); }
+    .re-spacer { flex: 1; }
+    .rule-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      overflow: hidden;
+      transition: border-color .15s;
+    }
+    .rule-card.disabled { opacity: .45; }
+    .rule-card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .rule-title-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font);
+      min-width: 0;
+    }
+    .rule-title-input::placeholder { color: var(--text3); }
+    .rule-toggle {
+      width: 28px; height: 16px;
+      border-radius: 99px;
+      border: 1px solid var(--border2);
+      background: var(--bg3);
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: background .2s, border-color .2s;
+    }
+    .rule-toggle::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--text3);
+      top: 2px; left: 2px;
+      transition: transform .2s, background .2s;
+    }
+    .rule-toggle.on { background: var(--green-bg); border-color: var(--green-border); }
+    .rule-toggle.on::after { transform: translateX(12px); background: var(--green); }
+    .rule-del-btn {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 14px;
+      line-height: 1;
+      transition: color .15s, background .15s;
+    }
+    .rule-del-btn:hover { color: var(--red); background: var(--red-bg); }
+    .rule-textarea {
+      width: 100%;
+      background: var(--bg);
+      border: none;
+      outline: none;
+      color: var(--text2);
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.7;
+      padding: 10px 14px;
+      resize: vertical;
+      min-height: 72px;
+      tab-size: 2;
+      caret-color: var(--blue);
+      display: block;
+    }
+    .rule-textarea:focus { background: #0a0c0e; color: var(--text); }
+    .rule-textarea::selection { background: rgba(55,138,221,.3); }
+    .re-save-flash {
+      display: none;
+      font-size: 11px;
+      color: var(--green);
+      align-items: center;
+      gap: 4px;
+    }
+    .re-save-flash.show { display: flex; }
+    .rule-count-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+    /* ── CODE BLOCKS ── */
+    .rule-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.7;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .rk { color: var(--blue); }
+    .rv { color: var(--green); }
+    .ro { color: var(--warn); }
+    .rc { color: var(--text3); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .metrics      { grid-template-columns: repeat(2, 1fr); }
+      .attack-grid  { grid-template-columns: repeat(3, 1fr); }
+      .panels       { grid-template-columns: 1fr; }
+      .hero h1      { font-size: 22px; }
+      .vstats-top   { grid-template-columns: repeat(2, 1fr); }
+      .vstats-bot   { grid-template-columns: repeat(2, 1fr); }
+      .donut-row    { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-brand">
+    <div class="icon-wrap"><i class="ti ti-shield-bolt"></i></div>
+    FraudSim
+  </a>
+  <div class="nav-right">
+    <span style="font-size:12px;color:var(--text3)">OWASP 2025 · Payment Fraud</span>
+    <span class="nav-badge nb-idle" id="sim-status">Idle</span>
+  </div>
+</nav>
+
+<!-- MODAL OVERLAY -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-title">Report</span>
+      <button class="modal-close" id="modal-close-btn"><i class="ti ti-x" style="font-size:13px"></i> Close</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag"><i class="ti ti-shield-lock" style="font-size:12px"></i>Educational simulation — OWASP Top 10 2025</div>
+    <h1><span>Fraud</span> Detection Simulation</h1>
+    <p>Live fraud attack and defence scenario based on real-world cases. Select fraud vectors and payment system targets, then launch to watch attacker and defender respond in real time.</p>
+  </div>
+
+  <!-- METRICS -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Fraud attempts</div>
+      <div class="metric-val mv-red" id="m-attacks">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Detections triggered</div>
+      <div class="metric-val mv-blue" id="m-defenses">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Threats blocked</div>
+      <div class="metric-val mv-green" id="m-blocked">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Breaches / losses</div>
+      <div class="metric-val mv-warn" id="m-breaches">0</div>
+    </div>
+  </div>
+
+  <!-- SCORE BAR -->
+  <div class="score-wrap">
+    <span class="score-label red" id="lbl-red">Fraud — 50%</span>
+    <div class="score-track">
+      <div class="score-r" id="score-red" style="width:50%"></div>
+      <div class="score-b" id="score-blue" style="width:50%"></div>
+    </div>
+    <span class="score-label blue" id="lbl-blue">Defence — 50%</span>
+  </div>
+
+  <!-- FRAUD VECTORS -->
+  <div class="sec-hd">Select fraud vectors</div>
+  <div class="attack-grid" id="atk-grid">
+    <div class="atk-chip selected" data-key="card">
+      <i class="ti ti-credit-card"></i>
+      <span class="chip-name">Card Cracking</span>
+      <span class="chip-owasp">A04 · HIGH</span>
+    </div>
+    <div class="atk-chip selected" data-key="ato">
+      <i class="ti ti-user-off"></i>
+      <span class="chip-name">Account Takeover</span>
+      <span class="chip-owasp">A07 · HIGH</span>
+    </div>
+    <div class="atk-chip selected" data-key="chargeback">
+      <i class="ti ti-receipt-refund"></i>
+      <span class="chip-name">Chargeback Fraud</span>
+      <span class="chip-owasp">A06 · HIGH</span>
+    </div>
+    <div class="atk-chip selected" data-key="promo">
+      <i class="ti ti-percentage"></i>
+      <span class="chip-name">Promo Abuse</span>
+      <span class="chip-owasp">A01 · MEDIUM</span>
+    </div>
+    <div class="atk-chip selected" data-key="bot">
+      <i class="ti ti-robot"></i>
+      <span class="chip-name">Bot Checkout</span>
+      <span class="chip-owasp">A02 · HIGH</span>
+    </div>
+  </div>
+
+  <!-- TARGETS -->
+  <div class="sec-hd">Select targets</div>
+  <div class="target-bar" id="target-bar">
+    <span class="target-pill active" data-t="Payment Gateway">Payment Gateway</span>
+    <span class="target-pill active" data-t="Auth Service">Auth Service</span>
+    <span class="target-pill active" data-t="Checkout API">Checkout API</span>
+    <span class="target-pill active" data-t="Promo Engine">Promo Engine</span>
+    <span class="target-pill active" data-t="User Database">User Database</span>
+    <span class="target-pill active" data-t="Fraud Engine">Fraud Engine</span>
+  </div>
+
+  <!-- THREAT STATUS LIST -->
+  <div class="threat-list" id="threat-list">
+    <div class="threat-row">
+      <i class="ti ti-dots" style="color:var(--text3);font-size:15px"></i>
+      <span class="threat-name" style="color:var(--text3);font-weight:400">No active threats — launch simulation to begin</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn-launch" id="btn-start" onclick="startSim()">
+      <i class="ti ti-player-play"></i> Launch simulation
+    </button>
+    <button class="btn-reset" onclick="resetSim()">
+      <i class="ti ti-refresh"></i> Reset
+    </button>
+  </div>
+
+  <!-- LOG PANELS -->
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header red-hd">
+        <i class="ti ti-sword" style="color:var(--red);font-size:17px"></i>
+        <span class="panel-title" style="color:var(--red)">Fraudster — attacker</span>
+        <span class="panel-sub">external threat actor</span>
+      </div>
+      <div class="panel-body" id="red-log">
+        <div class="log-entry">
+          <span class="dot dot-red"></span>
+          <span class="log-time">--:--</span>
+          <span class="log-msg">Waiting for simulation to start...</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header blue-hd">
+        <i class="ti ti-shield-check" style="color:var(--blue);font-size:17px"></i>
+        <span class="panel-title" style="color:var(--blue)">Fraud Detection — defender</span>
+        <span class="panel-sub">device intelligence engine</span>
+      </div>
+      <div class="panel-body" id="blue-log">
+        <div class="log-entry">
+          <span class="dot dot-blue"></span>
+          <span class="log-time">--:--</span>
+          <span class="log-msg">Monitoring all payment flows — standby...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER ACTIONS -->
+  <div class="footer-actions">
+    <button class="action-btn" onclick="openReport()">
+      <i class="ti ti-report-analytics"></i> OWASP Vulnerability Report
+    </button>
+    <button class="action-btn" onclick="openFixAuth()">
+      <i class="ti ti-lock"></i> Fix Auth Failures
+    </button>
+    <button class="action-btn" onclick="openHardenCheckout()">
+      <i class="ti ti-shield"></i> Harden Checkout
+    </button>
+    <button class="action-btn" onclick="openDetectionRules()">
+      <i class="ti ti-list-check"></i> Detection Rules
+    </button>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+/* ════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════ */
+let running = false;
+let attacks = 0, defenses = 0, blocked = 0, breaches = 0, simTime = 0;
+
+// Per-vector outcome tracking (feeds OWASP report)
+const perVec = {
+  card:       { atk: 0, blk: 0, brch: 0 },
+  ato:        { atk: 0, blk: 0, brch: 0 },
+  chargeback: { atk: 0, blk: 0, brch: 0 },
+  promo:      { atk: 0, blk: 0, brch: 0 },
+  bot:        { atk: 0, blk: 0, brch: 0 },
+};
+
+const ATK_NAMES = {
+  card:       'Card Cracking',
+  ato:        'Account Takeover',
+  chargeback: 'Chargeback Fraud',
+  promo:      'Promo Abuse',
+  bot:        'Bot Checkout',
+};
+const ATK_OWASP = {
+  card:       { id: 'A04', sev: 'HIGH' },   // Cryptographic Failures
+  ato:        { id: 'A07', sev: 'HIGH' },   // Authentication Failures
+  chargeback: { id: 'A06', sev: 'HIGH' },   // Insecure Design
+  promo:      { id: 'A01', sev: 'MEDIUM' }, // Broken Access Control
+  bot:        { id: 'A02', sev: 'HIGH' },   // Security Misconfiguration
+};
+
+/* ════════════════════════════════════════════
+   SCENARIOS — based on real-world payment fraud cases
+════════════════════════════════════════════ */
+const RED = {
+  card: [
+    "Loading BIN list for Visa 4532-xxxx series — submitting $0.01 micro-charges to validate stolen cards",
+    "200 micro-transactions fired on /api/payment in 90s — 14 valid cards confirmed at 7% hit rate",
+    "Rotating residential proxy pool (47 IPs, 3/min) to evade velocity limits at payment gateway",
+    "Carding bot bypassed basic CAPTCHA — using 2captcha API ($0.001/solve) at 1,200 solves/min",
+    "Escalating: 14 confirmed cards queued for $340-avg orders before cardholders notice the test charge",
+  ],
+  ato: [
+    "Credential stuffing: loading 2.4M combo list from Collection #1 data breach against /api/auth/login",
+    "Distributing load across 340 residential proxies to evade per-IP rate limiting on auth endpoint",
+    "Valid credential hit on user #44821 — initiating silent session hijack via forged cookie",
+    "Low-and-slow ATO: 1 attempt per account per 3h to stay below anomaly detection threshold",
+    "OAuth token stolen from phishing campaign — replaying across mobile and web sessions",
+  ],
+  chargeback: [
+    "Placing 12 high-value orders ($450–$900 ea.) on stolen card before cardholder reports fraud to issuer",
+    "Friendly fraud: ordering $1,200 electronics, then filing 'item not received' dispute with Visa",
+    "Coordinated chargeback ring: 8 mule accounts ordering and disputing within overlapping 72h window",
+    "Routing through fresh VPN endpoint + new device to hide repeat chargeback pattern across merchants",
+    "Digital goods chargeback: claiming non-delivery on 6 fulfilled gift card orders — no physical proof",
+  ],
+  promo: [
+    "Creating 38 disposable +alias accounts (user+1@, user+2@...) to claim $20 new-user bonus each",
+    "Promo stacking exploit: combining stackable codes for effective 100% discount on $340 checkout",
+    "Multi-accounting: 15 accounts created from same device fingerprint to farm $15 referral bonuses",
+    "Automated code scraper testing 500+ coupon codes at 50 req/sec — harvesting active promo codes",
+    "Android emulator farm (12 VMs) claiming mobile-exclusive first-order discounts across fake profiles",
+  ],
+  bot: [
+    "Sneaker bot deployed: 4,500 checkout attempts in 8 min on limited-edition Nike Air Max drop",
+    "Inventory denial attack: bots holding 200 cart slots simultaneously, blocking real shoppers",
+    "Headless Chrome farm executing full JS checkout flow to bypass basic script-detection filters",
+    "Rotating user-agent strings + spoofing WebGL/Canvas fingerprint across 80 browser profiles",
+    "AI-driven CAPTCHA solving service processing 1,200 challenges/min at 97% success rate",
+  ],
+};
+
+const BLUE = {
+  card: [
+    "Velocity rule fired: 50+ payment attempts from VisitorID fp_8a2c91d in 10 min — gateway blocked",
+    "Micro-transaction pattern detected — ML fraud model flagged 200 sub-$1 charges: risk score 96/100",
+    "Proxy detection: 41/47 IPs identified as residential-proxy origin — CAPTCHA challenge injected",
+    "CAPTCHA farm identified via request-timing signature (0.8s avg solve) — IP range banned",
+    "Device fingerprint linked all 14 validated cards to single VisitorID — issuers notified, cards frozen",
+  ],
+  ato: [
+    "Credential stuffing detected: 2,400 failed logins from 340 IPs in 15 min — IP cluster blocked",
+    "Device fingerprint fp_3d7a1bc matched across 14 failed account attempts — cluster suspended",
+    "Session anomaly: account #44821 login from RO after 18-month US history — MFA challenge issued",
+    "Slow-ATO surfaced by ML time-series model — step-up authentication triggered across affected segment",
+    "OAuth token replay blocked: token revoked, account locked, owner notified via push notification",
+  ],
+  chargeback: [
+    "High-value order cluster flagged: $6,800 from single VisitorID in 4h — held for manual review",
+    "Compelling evidence package built: device ID, IP, geolocation, delivery timestamp — submitted to Visa",
+    "Chargeback ring identified via shared-device graph analysis — 8 linked accounts suspended",
+    "VPN + new device combo: risk score 88/100 — 3D Secure authentication required before fulfilment",
+    "Server-side delivery logs + device fingerprint submitted as dispute evidence — 6/6 chargebacks won",
+  ],
+  promo: [
+    "Email alias clustering: 38 accounts share same canonical address — all promo credits frozen",
+    "Promo stacking blocked — server-side rule: max 1 stackable code per VisitorID per campaign",
+    "Multi-accounting alert: fp_5c8e44a linked to 15 new signups within 48h — all accounts suspended",
+    "Bot traffic on /api/promo detected — Turnstile challenge deployed; 94% of requests fail bot check",
+    "Android emulator signal detected on 7/12 devices — mobile-exclusive discount claims rejected",
+  ],
+  bot: [
+    "Bot detected: 4,500 req in 8 min, headless browser signal positive — IP block + CAPTCHA wall",
+    "Inventory abuse: cart-hold timeout reduced to 5 min + VisitorID required for each reservation",
+    "Behavioural biometrics: inhuman mouse trajectories detected — CAPTCHA served to all flagged agents",
+    "TLS fingerprint mismatch detected across 80 browser profiles — sessions terminated",
+    "CAPTCHA-farm timing pattern identified — switched to audio challenge; bot solve rate drops to 12%",
+  ],
+};
+
+/* ════════════════════════════════════════════
+   SIMULATION ENGINE
+════════════════════════════════════════════ */
+function fmtTime(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function appendLog(panelId, html, dotClass) {
+  const panel = document.getElementById(panelId);
+  const e = document.createElement('div');
+  e.className = 'log-entry';
+  e.innerHTML = `<span class="dot ${dotClass}"></span><span class="log-time">${fmtTime(simTime)}</span><span class="log-msg">${html}</span>`;
+  panel.appendChild(e);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function updateMetrics() {
+  document.getElementById('m-attacks').textContent   = attacks;
+  document.getElementById('m-defenses').textContent  = defenses;
+  document.getElementById('m-blocked').textContent   = blocked;
+  document.getElementById('m-breaches').textContent  = breaches;
+  const total = blocked + breaches || 1;
+  const bw = Math.round((blocked / total) * 100);
+  const rw = 100 - bw;
+  document.getElementById('score-red').style.width   = rw + '%';
+  document.getElementById('score-blue').style.width  = bw + '%';
+  document.getElementById('lbl-red').textContent     = `Fraud — ${rw}%`;
+  document.getElementById('lbl-blue').textContent    = `Defence — ${bw}%`;
+}
+
+function getSelectedAttacks() {
+  return [...document.querySelectorAll('.atk-chip.selected')].map(c => c.dataset.key);
+}
+function getSelectedTargets() {
+  return [...document.querySelectorAll('.target-pill.active')].map(c => c.dataset.t);
+}
+
+function buildThreatList(keys) {
+  const list = document.getElementById('threat-list');
+  list.innerHTML = '';
+  keys.forEach(k => {
+    const o = ATK_OWASP[k];
+    const row = document.createElement('div');
+    row.className = 'threat-row';
+    row.innerHTML = `
+      <i class="ti ti-alert-triangle" style="color:var(--text3);font-size:15px"></i>
+      <span class="threat-name">${ATK_NAMES[k]}</span>
+      <span class="owasp-badge">${o.id}</span>
+      <span class="sev-badge ${o.sev === 'HIGH' ? 'sev-high' : 'sev-med'}">${o.sev}</span>
+      <span class="threat-status ts-pending" id="ts-${k}">Pending</span>`;
+    list.appendChild(row);
+  });
+}
+
+function setThreatStatus(key, status) {
+  const el = document.getElementById('ts-' + key);
+  if (!el) return;
+  const map = { active: ['ts-active','Active'], blocked: ['ts-blocked','Blocked'], breached: ['ts-breached','Breached'] };
+  el.className = 'threat-status ' + (map[status]?.[0] ?? 'ts-pending');
+  el.textContent = map[status]?.[1] ?? 'Pending';
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runAgentTurn(key, targets) {
+  const target  = targets[Math.floor(Math.random() * targets.length)] || 'Checkout API';
+  const redMsg  = RED[key][Math.floor(Math.random() * 5)];
+  const blueMsg = BLUE[key][Math.floor(Math.random() * 5)];
+  setThreatStatus(key, 'active');
+  appendLog('red-log', `<strong>[${ATK_NAMES[key]}]</strong> → ${target}: ${redMsg}`, 'dot-red');
+  attacks++; perVec[key].atk++;
+  updateMetrics();
+  await delay(900 + Math.random() * 600);
+  defenses++;
+  if (Math.random() < 0.72) {
+    appendLog('blue-log', `<strong>[Blocked]</strong> ${blueMsg}`, 'dot-ok');
+    blocked++; perVec[key].blk++;
+    setThreatStatus(key, 'blocked');
+  } else {
+    appendLog('blue-log', `<strong>[Alert]</strong> ${blueMsg} — partial breach detected!`, 'dot-warn');
+    breaches++; perVec[key].brch++;
+    setThreatStatus(key, 'breached');
+    appendLog('red-log', `<strong>[Success]</strong> Partial access on ${target} — escalating fraud attempt...`, 'dot-warn');
+  }
+  updateMetrics();
+}
+
+async function runSimRound() {
+  const selAtks = getSelectedAttacks();
+  const selTgts = getSelectedTargets();
+  if (!selAtks.length || !selTgts.length) return;
+  buildThreatList(selAtks);
+  const shuffled = [...selAtks].sort(() => Math.random() - .5);
+  for (const atk of shuffled) {
+    if (!running) break;
+    simTime += Math.floor(5 + Math.random() * 10);
+    await runAgentTurn(atk, selTgts);
+    await delay(400);
+  }
+  appendLog('red-log',  '<strong>[Round complete]</strong> Regrouping — preparing next fraud wave...', 'dot-red');
+  appendLog('blue-log', '<strong>[Summary]</strong> Round reviewed — updating fraud rules and device blocklists', 'dot-blue');
+  simTime += 15;
+  updateMetrics();
+}
+
+function setStatus(cls, label) {
+  const el = document.getElementById('sim-status');
+  el.className = 'nav-badge ' + cls;
+  el.textContent = label;
+}
+
+async function startSim() {
+  if (running) return;
+  running = true;
+  document.getElementById('btn-start').disabled = true;
+  setStatus('nb-running', 'Running');
+  document.getElementById('red-log').innerHTML  = '';
+  document.getElementById('blue-log').innerHTML = '';
+  appendLog('red-log',  '<strong>[Init]</strong> Threat actor online — payment fraud toolkit initialised', 'dot-red');
+  appendLog('blue-log', '<strong>[Init]</strong> Fraud detection engine online — monitoring all payment flows', 'dot-blue');
+  for (let round = 0; running && round < 3; round++) {
+    await delay(600);
+    await runSimRound();
+    await delay(800);
+  }
+  running = false;
+  document.getElementById('btn-start').disabled = false;
+  setStatus('nb-done', 'Complete');
+  appendLog('red-log',  '<strong>[Done]</strong> Simulation complete — see OWASP report for vulnerability breakdown', 'dot-red');
+  appendLog('blue-log', `<strong>[Done]</strong> Simulation complete — ${blocked} threats neutralised, ${breaches} breach(es) logged`, 'dot-blue');
+}
+
+function resetSim() {
+  running = false;
+  attacks = defenses = blocked = breaches = simTime = 0;
+  Object.keys(perVec).forEach(k => { perVec[k].atk = 0; perVec[k].blk = 0; perVec[k].brch = 0; });
+  document.getElementById('btn-start').disabled = false;
+  setStatus('nb-idle', 'Idle');
+  document.getElementById('red-log').innerHTML  = '<div class="log-entry"><span class="dot dot-red"></span><span class="log-time">--:--</span><span class="log-msg">Waiting for simulation to start...</span></div>';
+  document.getElementById('blue-log').innerHTML = '<div class="log-entry"><span class="dot dot-blue"></span><span class="log-time">--:--</span><span class="log-msg">Monitoring all payment flows — standby...</span></div>';
+  document.getElementById('threat-list').innerHTML = '<div class="threat-row"><i class="ti ti-dots" style="color:var(--text3);font-size:15px"></i><span class="threat-name" style="color:var(--text3);font-weight:400">No active threats — launch simulation to begin</span></div>';
+  document.getElementById('score-red').style.width  = '50%';
+  document.getElementById('score-blue').style.width = '50%';
+  document.getElementById('lbl-red').textContent    = 'Fraud — 50%';
+  document.getElementById('lbl-blue').textContent   = 'Defence — 50%';
+  updateMetrics();
+}
+
+document.getElementById('atk-grid').addEventListener('click', e => {
+  const chip = e.target.closest('.atk-chip');
+  if (chip && !running) chip.classList.toggle('selected');
+});
+document.getElementById('target-bar').addEventListener('click', e => {
+  const pill = e.target.closest('.target-pill');
+  if (pill && !running) pill.classList.toggle('active');
+});
+
+/* ════════════════════════════════════════════
+   MODAL SYSTEM
+════════════════════════════════════════════ */
+function openModal(title, bodyHTML) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHTML;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModalFn() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+document.getElementById('modal-close-btn').addEventListener('click', closeModalFn);
+document.getElementById('modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModalFn();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalFn(); });
+
+/* ════════════════════════════════════════════
+   DONUT CHART BUILDER (SVG stroke-dasharray)
+   r=40, cx=cy=50, circumference ≈ 251.33
+════════════════════════════════════════════ */
+const C = 2 * Math.PI * 40;
+function buildDonut(segments) {
+  // segments: [{color, count}, ...]
+  const total = segments.reduce((s, d) => s + d.count, 0) || 1;
+  let svg = `<svg width="110" height="110" viewBox="0 0 100 100" style="transform:rotate(-90deg);flex-shrink:0">`;
+  svg += `<circle cx="50" cy="50" r="40" fill="none" stroke="#1b1d20" stroke-width="16"/>`;
+  let cumLen = 0;
+  for (const seg of segments) {
+    if (seg.count === 0) continue;
+    const len = (seg.count / total) * C;
+    svg += `<circle cx="50" cy="50" r="40" fill="none" stroke="${seg.color}" stroke-width="16" stroke-dasharray="${len.toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-cumLen).toFixed(2)}"/>`;
+    cumLen += len;
+  }
+  svg += `</svg>`;
+  return svg;
+}
+
+function legendHTML(segments, total) {
+  let html = '';
+  for (const s of segments) {
+    html += `<div class="dl-row"><div class="dl-swatch" style="background:${s.color}"></div><span class="dl-name">${s.label}</span><span class="dl-count">${s.count}</span></div>`;
+  }
+  html += `<div class="dl-total-row"><span class="dl-total-lbl">TOTAL</span><span class="dl-total-num">${total}</span></div>`;
+  return html;
+}
+
+/* ════════════════════════════════════════════
+   OWASP VULNERABILITY REPORT — live from simulation
+════════════════════════════════════════════ */
+function openReport() {
+  const COLORS = { crit: '#cc2222', high: '#e0522c', med: '#ef9f27', low: '#fbbf24', bp: '#2563eb', info: '#60a5fa' };
+
+  // ── Derive counts from live simulation data ──────────────────
+  // HIGH-severity vectors: card (A07), ato (A07), chargeback (A04), bot (A04)
+  // MEDIUM-severity vectors: promo (A01)
+  const highVecs = ['card', 'ato', 'chargeback', 'bot'];
+  const medVecs  = ['promo'];
+
+  const idHigh = highVecs.reduce((s, k) => s + perVec[k].atk, 0);
+  const idMed  = medVecs.reduce((s, k)  => s + perVec[k].atk, 0);
+  const idLow  = blocked;   // blocked probes = vulnerability present but mitigated
+  const idTotal = attacks;
+
+  const cfHigh = highVecs.reduce((s, k) => s + perVec[k].brch, 0);
+  const cfMed  = medVecs.reduce((s, k)  => s + perVec[k].brch, 0);
+  const cfTotal = breaches;
+
+  // OWASP 2025 row counts — per-category attack + breach tallies
+  const cntA01 = perVec.promo.atk;                              // Broken Access Control
+  const cntA02 = perVec.bot.atk;                                // Security Misconfiguration
+  const cntA03 = attacks > 0 ? 1 : 0;                          // Supply Chain (structural — SDK always at risk)
+  const cntA04 = perVec.card.atk;                               // Cryptographic Failures
+  const cntA05 = attacks > 0 ? 1 : 0;                          // Injection (structural surface)
+  const cntA06 = perVec.chargeback.atk;                         // Insecure Design
+  const cntA07 = perVec.ato.atk;                                // Authentication Failures
+  const cntA08 = breaches > 0 ? 1 : 0;                         // Data Integrity (surfaces on breach)
+  const cntA09 = attacks > 0 ? 1 : 0;                          // Logging/Alerting (structural)
+  const cntA10 = breaches > 0 ? breaches : 0;                  // Exception Mishandling (surfaces on breach)
+
+  // Active vectors label
+  const activeVecs = Object.keys(perVec).filter(k => perVec[k].atk > 0)
+    .map(k => ATK_NAMES[k]).join(' · ') || 'No vectors run yet';
+
+  const notRun = attacks === 0;
+
+  const idSegs = [
+    { color: COLORS.crit, label: 'Critical',     count: 0 },
+    { color: COLORS.high, label: 'High',          count: idHigh },
+    { color: COLORS.med,  label: 'Medium',        count: idMed },
+    { color: COLORS.low,  label: 'Low (blocked)', count: idLow },
+    { color: COLORS.bp,   label: 'Best Practice', count: 0 },
+    { color: COLORS.info, label: 'Information',   count: 0 },
+  ];
+  const cfSegs = [
+    { color: COLORS.crit, label: 'Critical',     count: 0 },
+    { color: COLORS.high, label: 'High',          count: cfHigh },
+    { color: COLORS.med,  label: 'Medium',        count: cfMed },
+    { color: COLORS.low,  label: 'Low',           count: 0 },
+    { color: COLORS.bp,   label: 'Best Practice', count: 0 },
+    { color: COLORS.info, label: 'Information',   count: 0 },
+  ];
+
+  const html = `
+    <div class="report-note">
+      This report reflects <strong style="color:var(--text)">live simulation results</strong> — counts update with each run.
+      ${notRun ? '<span class="warn-line">⚠ No simulation data yet — launch the simulation first to populate this report.</span>' : `Vectors tested: <strong style="color:var(--text)">${activeVecs}</strong><span class="warn-line">⚠ There may be structural vulnerabilities not counted below (e.g. A06 components). See detailed scan report.</span>`}
+    </div>
+
+    <div class="vstats-top">
+      <div class="vstat">
+        <div class="vstat-num">${idTotal}</div>
+        <div class="vstat-lbl">Identified</div>
+      </div>
+      <div class="vstat">
+        <div class="vstat-num">${cfTotal}</div>
+        <div class="vstat-lbl">Confirmed</div>
+      </div>
+      <div class="vstat">
+        <div class="vstat-dot" style="background:var(--red)"></div>
+        <div class="vstat-num">0</div>
+        <div class="vstat-lbl">Critical</div>
+      </div>
+    </div>
+
+    <div class="vstats-bot">
+      <div class="vsub">
+        <span class="vsub-lbl">🚩 High</span>
+        <span class="vsub-num" style="color:var(--red)">${idHigh}</span>
+      </div>
+      <div class="vsub">
+        <span class="vsub-lbl">🚩 Medium</span>
+        <span class="vsub-num" style="color:var(--warn)">${idMed}</span>
+      </div>
+      <div class="vsub">
+        <span class="vsub-lbl">🚩 Low</span>
+        <span class="vsub-num" style="color:#fbbf24">${idLow}</span>
+      </div>
+      <div class="vsub">
+        <span class="vsub-lbl">✓ Blocked</span>
+        <span class="vsub-num" style="color:var(--green)">${blocked}</span>
+      </div>
+    </div>
+
+    <div class="donut-row">
+      <div class="donut-card">
+        <div class="donut-card-title">Identified Vulnerabilities <span style="font-size:10px;font-weight:400;color:var(--text3)">— ${idTotal} total probes</span></div>
+        <div class="donut-inner">
+          ${buildDonut(idSegs)}
+          <div class="donut-legend">${legendHTML(idSegs, idTotal)}</div>
+        </div>
+      </div>
+      <div class="donut-card">
+        <div class="donut-card-title">Confirmed Breaches <span style="font-size:10px;font-weight:400;color:var(--text3)">— ${cfTotal} exploited</span></div>
+        <div class="donut-inner">
+          ${buildDonut(cfSegs)}
+          <div class="donut-legend">${legendHTML(cfSegs, cfTotal)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-hd" style="margin-bottom:10px">OWASP 2025 Category Breakdown</div>
+    <table class="owasp-tbl">
+      <thead><tr><th>Category</th><th>Vulnerability</th><th>Sev.</th><th>Probes</th><th>Breached</th></tr></thead>
+      <tbody>
+        <tr ${cntA01 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A01</span></td>
+          <td>
+            <div class="vuln-title">Broken Access Control</div>
+            <div class="vuln-detail">Promo API accepts stacked codes without per-device session binding; multi-accounting via email aliases bypasses new-user restrictions</div>
+          </td>
+          <td><span class="sev-badge sev-med">MED</span></td>
+          <td class="cnt">${cntA01}</td>
+          <td class="cnt" style="color:${perVec.promo.brch > 0 ? 'var(--red)' : 'var(--text3)'}">${perVec.promo.brch || '-'}</td>
+        </tr>
+        <tr ${cntA02 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A02</span></td>
+          <td>
+            <div class="vuln-title">Security Misconfiguration</div>
+            <div class="vuln-detail">Missing rate-limit headers on /api/checkout; CORS wildcard on payment endpoint; bot traffic unrestricted due to missing WAF rules</div>
+          </td>
+          <td><span class="sev-badge sev-high">HIGH</span></td>
+          <td class="cnt">${cntA02}</td>
+          <td class="cnt" style="color:${perVec.bot.brch > 0 ? 'var(--red)' : 'var(--text3)'}">${perVec.bot.brch || '-'}</td>
+        </tr>
+        <tr ${cntA03 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A03</span></td>
+          <td>
+            <div class="vuln-title">Software Supply Chain Failures</div>
+            <div class="vuln-detail">Payment SDK v2.1 (EOL) — CVE-2022-39220; CAPTCHA library 3 major versions behind; no SRI hashes on third-party checkout scripts</div>
+          </td>
+          <td><span class="sev-badge sev-med">MED</span></td>
+          <td class="cnt">${cntA03}</td>
+          <td class="cnt" style="color:var(--text3)">—</td>
+        </tr>
+        <tr ${cntA04 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A04</span></td>
+          <td>
+            <div class="vuln-title">Cryptographic Failures</div>
+            <div class="vuln-detail">Partial PAN visible in error log output during card cracking probe; card data present in plaintext debug trace; TLS 1.1 still accepted on legacy gateway</div>
+          </td>
+          <td><span class="sev-badge sev-high">HIGH</span></td>
+          <td class="cnt">${cntA04}</td>
+          <td class="cnt" style="color:${perVec.card.brch > 0 ? 'var(--red)' : 'var(--text3)'}">${perVec.card.brch || '-'}</td>
+        </tr>
+        <tr ${cntA05 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A05</span></td>
+          <td>
+            <div class="vuln-title">Injection</div>
+            <div class="vuln-detail">Payment reference and promo code fields lack input sanitisation; NoSQL injection possible via \$where on order lookup endpoint</div>
+          </td>
+          <td><span class="sev-badge sev-high">HIGH</span></td>
+          <td class="cnt">${cntA05}</td>
+          <td class="cnt" style="color:var(--text3)">—</td>
+        </tr>
+        <tr ${cntA06 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A06</span></td>
+          <td>
+            <div class="vuln-title">Insecure Design</div>
+            <div class="vuln-detail">No 3DS enforcement on high-value orders; no chargeback evidence collection pipeline; cart hold has no per-device limit enabling inventory denial</div>
+          </td>
+          <td><span class="sev-badge sev-high">HIGH</span></td>
+          <td class="cnt">${cntA06}</td>
+          <td class="cnt" style="color:${perVec.chargeback.brch > 0 ? 'var(--red)' : 'var(--text3)'}">${perVec.chargeback.brch || '-'}</td>
+        </tr>
+        <tr ${cntA07 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A07</span></td>
+          <td>
+            <div class="vuln-title">Authentication Failures</div>
+            <div class="vuln-detail">No rate limiting on /api/auth/login enabling credential stuffing; payment sessions not bound to device fingerprint enabling ATO and session replay</div>
+          </td>
+          <td><span class="sev-badge sev-high">HIGH</span></td>
+          <td class="cnt">${cntA07}</td>
+          <td class="cnt" style="color:${perVec.ato.brch > 0 ? 'var(--red)' : 'var(--text3)'}">${perVec.ato.brch || '-'}</td>
+        </tr>
+        <tr ${cntA08 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A08</span></td>
+          <td>
+            <div class="vuln-title">Software or Data Integrity Failures</div>
+            <div class="vuln-detail">Client-submitted cart totals accepted without server-side revalidation; unsigned webhooks processed; discount rates not re-verified on checkout submission</div>
+          </td>
+          <td><span class="sev-badge sev-med">MED</span></td>
+          <td class="cnt">${cntA08}</td>
+          <td class="cnt" style="color:var(--text3)">—</td>
+        </tr>
+        <tr ${cntA09 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A09</span></td>
+          <td>
+            <div class="vuln-title">Security Logging and Alerting Failures</div>
+            <div class="vuln-detail">No velocity alert when card attempts exceed 10/device/hour; incomplete chargeback audit trail; failed logins not aggregated for real-time pattern detection</div>
+          </td>
+          <td><span class="sev-badge sev-med">MED</span></td>
+          <td class="cnt">${cntA09}</td>
+          <td class="cnt" style="color:${breaches > 0 ? 'var(--red)' : 'var(--text3)'}">${breaches > 0 ? breaches : '—'}</td>
+        </tr>
+        <tr ${cntA10 === 0 ? 'style="opacity:.45"' : ''}>
+          <td><span class="owasp-badge">A10</span></td>
+          <td>
+            <div class="vuln-title">Mishandling of Exceptional Conditions</div>
+            <div class="vuln-detail">Payment error responses expose raw card data and stack traces; no exponential backoff on payment retries enabling retry-loop abuse</div>
+          </td>
+          <td><span class="sev-badge sev-med">MED</span></td>
+          <td class="cnt">${cntA10}</td>
+          <td class="cnt" style="color:${cntA10 > 0 ? 'var(--red)' : 'var(--text3)'}">${cntA10 || '-'}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:11px;color:var(--text3);margin-top:12px">
+      Based on OWASP Top 10 2025 — categories reflect the latest threat landscape including A03 Supply Chain and A10 Exception Handling, new to the 2025 list.<br>
+      <span style="color:var(--text3)">Report generated from live simulation · ${attacks} total probes · ${blocked} blocked · ${breaches} breached · ${attacks === 0 ? 'No data yet — run simulation first' : new Date().toLocaleString()}</span>
+    </p>
+  `;
+  openModal('OWASP Vulnerability Report', html);
+}
+
+/* ════════════════════════════════════════════
+   FIX AUTH FAILURES — OWASP A07
+════════════════════════════════════════════ */
+function openFixAuth() {
+  const html = `
+    <div class="report-note">
+      Remediation for <strong style="color:var(--text)">OWASP A07 — Identification and Authentication Failures</strong><br>
+      Addresses card cracking and account takeover attack patterns observed in simulation.
+    </div>
+    <ul class="remed-list">
+      <li class="remed-item">
+        <div class="remed-num">1</div>
+        <div class="remed-text">
+          <strong>Rate-limit /api/auth/login with sliding-window</strong>
+          Max 5 failed attempts per IP per 15 min. Return HTTP 429 with Retry-After. Apply exponential backoff on repeated failures. Trigger CAPTCHA after 3 consecutive failures.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">2</div>
+        <div class="remed-text">
+          <strong>Bind payment sessions to device fingerprint</strong>
+          Capture VisitorID at checkout initiation. Reject payment completions where session VisitorID differs from initiation VisitorID. Invalidate sessions on device change mid-flow.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">3</div>
+        <div class="remed-text">
+          <strong>Check credentials against breach databases</strong>
+          Query HaveIBeenPwned API (k-anonymity model) on every login. Force password reset on confirmed-breached credentials. Alert users to suspicious login geography (new country, new device).
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">4</div>
+        <div class="remed-text">
+          <strong>Enforce step-up MFA for high-risk signals</strong>
+          Trigger additional authentication when: new device fingerprint, new country, previous failed attempts, cart value &gt; $500, or ML fraud score &gt; 70/100.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">5</div>
+        <div class="remed-text">
+          <strong>Real case — Headout (2023)</strong>
+          The travel-experience platform Headout was targeted by coordinated ATO and chargeback attacks. After integrating Fingerprint device intelligence to bind each transaction to a unique VisitorID, they cut fraudulent chargebacks by 90%. "We previously could never identify the devices used by fraudulent actors the way we can today."
+          <span class="case-tag"><i class="ti ti-check" style="font-size:10px"></i> Confirmed outcome: 90% chargeback reduction</span>
+        </div>
+      </li>
+    </ul>`;
+  openModal('Fix Authentication Failures (A07)', html);
+}
+
+/* ════════════════════════════════════════════
+   HARDEN CHECKOUT — OWASP A04 + A01
+════════════════════════════════════════════ */
+function openHardenCheckout() {
+  const html = `
+    <div class="report-note">
+      Hardening steps for <strong style="color:var(--text)">OWASP A04 (Insecure Design) + A01 (Broken Access Control)</strong><br>
+      Addresses bot checkout, card cracking, chargeback fraud, and promo abuse patterns.
+    </div>
+    <ul class="remed-list">
+      <li class="remed-item">
+        <div class="remed-num">1</div>
+        <div class="remed-text">
+          <strong>Rate-limit payment attempts per device fingerprint</strong>
+          Max 3 payment attempts per VisitorID per 10-min window. Return 429 with Retry-After. Log all attempts with device fingerprint for downstream fraud analysis and dispute evidence.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">2</div>
+        <div class="remed-text">
+          <strong>Detect and block headless browsers at checkout</strong>
+          Check navigator.webdriver, canvas fingerprint consistency, mouse trajectory entropy, and TLS fingerprint. Reject sessions with bot-detection signal score above 0.6. Use Cloudflare Turnstile or equivalent invisible challenge.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">3</div>
+        <div class="remed-text">
+          <strong>Enforce server-side promo code validation</strong>
+          Validate discount codes server-side against (userID + deviceID + promoCode) tuple. One redemption per device fingerprint per campaign. Never trust client-computed discount — always recalculate total on server.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">4</div>
+        <div class="remed-text">
+          <strong>Build chargeback evidence collection pipeline</strong>
+          Log VisitorID, IP geolocation, user-agent, delivery confirmation, and order metadata at checkout. Retain for 540 days (Visa/Mastercard dispute window). Auto-generate dispute packages within 72h of chargeback notification.
+        </div>
+      </li>
+      <li class="remed-item">
+        <div class="remed-num">5</div>
+        <div class="remed-text">
+          <strong>Limit cart reservation abuse</strong>
+          Restrict cart holds to 8 min per session. Max 2 concurrent holds per VisitorID. Release inventory immediately on duplicate device signal or VPN detection above risk threshold.
+        </div>
+      </li>
+    </ul>`;
+  openModal('Harden Checkout API (A04 + A01)', html);
+}
+
+/* ════════════════════════════════════════════
+   DETECTION RULES — editable, persisted to localStorage
+════════════════════════════════════════════ */
+const DEFAULT_RULES = [
+  {
+    id: 'rule-a01',
+    title: 'A01 · Broken Access Control — Promo & Multi-Accounting',
+    enabled: true,
+    body: `# Promo API lacks per-device session binding (OWASP 2025 A01)\nIF  promo.device_redemptions >= 1\n OR email.canonical IN device.known_email_set\n OR device.account_age_hours < 24\nTHEN reject_promo, log_event(type="broken_access_control")`
+  },
+  {
+    id: 'rule-a02',
+    title: 'A02 · Security Misconfiguration — Bot Checkout',
+    enabled: true,
+    body: `# Misconfigured rate limits allow bot checkout abuse (OWASP 2025 A02)\nIF  device.request_rate_per_min > 60\n OR endpoint.rate_limit_header == null\n OR device.headless_signal == true\nTHEN block_checkout, serve_captcha_challenge, alert_devops(severity="HIGH")`
+  },
+  {
+    id: 'rule-a03',
+    title: 'A03 · Software Supply Chain Failures — SDK Integrity',
+    enabled: true,
+    body: `# Outdated / unverified payment SDK (OWASP 2025 A03)\nIF  dependency.payment_sdk_version < "3.0.0"\n OR dependency.integrity_hash_verified == false\n OR csp.subresource_integrity_missing == true\nTHEN block_checkout_load, alert_security_team(cve="CVE-2022-39220")`
+  },
+  {
+    id: 'rule-a04',
+    title: 'A04 · Cryptographic Failures — Card Cracking / PAN Exposure',
+    enabled: true,
+    body: `# PAN or CVV exposed in logs or error responses (OWASP 2025 A04)\nIF  log.contains_pan == true\n OR response.body MATCHES "[0-9]{13,19}"\n OR tls.version < 1.2\nTHEN sanitize_log, block_response, alert_pci_team\n\n# Micro-charge BIN-list card cracking\nIF  payment.amount < 1.00\nAND device.payment_attempts_10min > 5\nAND device.distinct_bins_24h > 2\nTHEN block_payment, flag_device(reason="card_cracking")`
+  },
+  {
+    id: 'rule-a05',
+    title: 'A05 · Injection — Payment API Input Validation',
+    enabled: true,
+    body: `# SQL/NoSQL injection in payment and promo fields (OWASP 2025 A05)\nIF  input.payment_ref MATCHES "[\"';--]"\n OR input.promo_code MATCHES "\\$where|\\$gt|\\$ne"\n OR input.order_id MATCHES "[^a-zA-Z0-9\\-_]"\nTHEN reject_input, log_event(type="injection_attempt", severity="HIGH")`
+  },
+  {
+    id: 'rule-a06',
+    title: 'A06 · Insecure Design — Chargeback Fraud',
+    enabled: true,
+    body: `# High-value order without 3DS or evidence collection (OWASP 2025 A06)\nIF  order.total > 300\nAND payment.three_ds_completed == false\nTHEN require_3ds, hold_for_review(hours=24)\n\n# Repeat chargeback account pattern\nIF  account.chargebacks_90d > 1\n OR account.dispute_rate > 0.02\nTHEN block_future_orders, build_evidence_package, flag_for_review`
+  },
+  {
+    id: 'rule-a07',
+    title: 'A07 · Authentication Failures — Account Takeover',
+    enabled: true,
+    body: `# Credential stuffing / slow ATO (OWASP 2025 A07)\nIF  auth.failed_attempts_15min > 5\nAND (device.is_new == true OR geo.country_changed == true)\nTHEN require_mfa, log_event(severity="HIGH")\n\n# Session hijack / token replay\nIF  session.visitor_id != token.issued_visitor_id\nTHEN revoke_token, lock_account, notify_user_push`
+  },
+  {
+    id: 'rule-a08',
+    title: 'A08 · Software or Data Integrity Failures — Cart Tampering',
+    enabled: true,
+    body: `# Client-side cart price tampering (OWASP 2025 A08)\nIF  cart.server_price != cart.client_submitted_price\n OR webhook.signature_valid == false\n OR order.discount_rate > 0.5 AND promo.server_verified == false\nTHEN reject_order, alert_fraud_team(type="integrity_violation")`
+  },
+  {
+    id: 'rule-a09',
+    title: 'A09 · Security Logging and Alerting Failures — Velocity Gaps',
+    enabled: true,
+    body: `# Missing fraud velocity alerts (OWASP 2025 A09)\nIF  device.payment_attempts_1h > 10\nAND alert.velocity_triggered == false\nTHEN force_alert(channel="pagerduty"), create_audit_entry(mandatory=true)\n\n# Incomplete chargeback audit trail\nIF  audit.chargeback_trail_complete == false\n OR log.failed_login_aggregated == false\nTHEN flag_audit_gap, notify_compliance_team`
+  },
+  {
+    id: 'rule-a10',
+    title: 'A10 · Mishandling of Exceptional Conditions — Error Leakage',
+    enabled: true,
+    body: `# Error responses leaking card/PAN data (OWASP 2025 A10)\nIF  error.response CONTAINS "card_number"\n OR error.response CONTAINS "cvv"\n OR error.stack_trace_exposed == true\nTHEN sanitize_error_response, log_event(type="data_leak")\n\n# Retry logic abuse on payment failure\nIF  retry.count > 3\nAND retry.backoff_applied == false\nTHEN apply_backoff(multiplier=2), flag_device(reason="retry_abuse")`
+  }
+];
+
+const LS_KEY = 'fraudsim_rules_v2'; // bumped: 2025 10-rule set
+
+function loadRules() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_RULES));
+}
+
+function saveRules(rules) {
+  localStorage.setItem(LS_KEY, JSON.stringify(rules));
+}
+
+function genId() {
+  return 'rule-' + Math.random().toString(36).slice(2, 8);
+}
+
+function openDetectionRules() {
+  let rules = loadRules();
+
+  function render() {
+    const enabledCount = rules.filter(r => r.enabled).length;
+    document.getElementById('modal-title').textContent = 'Fraud Detection Rules';
+    document.getElementById('modal-body').innerHTML = buildEditorHTML(rules, enabledCount);
+    attachEditorEvents();
+  }
+
+  function buildEditorHTML(rules, enabledCount) {
+    const cards = rules.map((r, i) => `
+      <div class="rule-card ${r.enabled ? '' : 'disabled'}" data-idx="${i}">
+        <div class="rule-card-head">
+          <div class="rule-toggle ${r.enabled ? 'on' : ''}" data-action="toggle" data-idx="${i}" title="${r.enabled ? 'Disable' : 'Enable'} rule"></div>
+          <input class="rule-title-input" data-action="title" data-idx="${i}" value="${r.title.replace(/"/g, '&quot;')}" placeholder="Rule name..." spellcheck="false" />
+          <button class="rule-del-btn" data-action="delete" data-idx="${i}" title="Delete rule"><i class="ti ti-trash"></i></button>
+        </div>
+        <textarea class="rule-textarea" data-action="body" data-idx="${i}" rows="${Math.max(4, r.body.split('\n').length + 1)}" spellcheck="false">${r.body}</textarea>
+      </div>
+    `).join('');
+
+    return `
+      <div class="report-note" style="margin-bottom:14px">
+        Rules are persisted in your browser — edits survive page refresh.
+        Changes only affect this simulation; export to deploy to your real fraud engine.
+        <span class="warn-line" style="color:var(--blue)">ℹ Tip: use IF / AND / OR / THEN keywords. Tab to indent. Each rule runs independently.</span>
+      </div>
+      <div class="rule-editor-toolbar">
+        <span class="rule-count-badge" id="re-count">${enabledCount} / ${rules.length} active</span>
+        <button class="re-btn primary" id="re-add"><i class="ti ti-plus"></i> Add Rule</button>
+        <button class="re-btn" id="re-copy"><i class="ti ti-copy"></i> Copy All</button>
+        <button class="re-btn warn" id="re-reset"><i class="ti ti-refresh"></i> Reset Defaults</button>
+        <div class="re-spacer"></div>
+        <span class="re-save-flash" id="re-flash"><i class="ti ti-check"></i> Saved</span>
+        <button class="re-btn success" id="re-save"><i class="ti ti-device-floppy"></i> Save All</button>
+      </div>
+      <div id="re-cards">${cards}</div>
+      <button class="re-btn" id="re-add2" style="width:100%;justify-content:center;margin-top:4px">
+        <i class="ti ti-plus"></i> Add new rule
+      </button>
+    `;
+  }
+
+  function attachEditorEvents() {
+    // Delegate clicks on rule actions
+    document.getElementById('re-cards').addEventListener('click', e => {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      const idx = parseInt(el.dataset.idx);
+      if (el.dataset.action === 'toggle') {
+        rules[idx].enabled = !rules[idx].enabled;
+        render();
+      } else if (el.dataset.action === 'delete') {
+        if (confirm(`Delete rule "${rules[idx].title}"?`)) {
+          rules.splice(idx, 1);
+          render();
+        }
+      }
+    });
+
+    // Live-sync title inputs
+    document.getElementById('re-cards').addEventListener('input', e => {
+      const el = e.target;
+      const idx = parseInt(el.dataset.idx);
+      if (el.dataset.action === 'title') rules[idx].title = el.value;
+      if (el.dataset.action === 'body')  rules[idx].body  = el.value;
+      // auto-grow textarea
+      if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    });
+
+    // Save
+    document.getElementById('re-save').addEventListener('click', () => {
+      saveRules(rules);
+      const flash = document.getElementById('re-flash');
+      flash.classList.add('show');
+      setTimeout(() => flash.classList.remove('show'), 2000);
+    });
+
+    // Add rule (both buttons)
+    function addRule() {
+      rules.push({ id: genId(), title: 'New Rule', enabled: true, body: '# Describe your rule\nIF  \nTHEN ' });
+      render();
+      // Scroll to and focus the new title input
+      const cards = document.querySelectorAll('.rule-card');
+      const last = cards[cards.length - 1];
+      if (last) {
+        last.scrollIntoView({ block: 'nearest' });
+        const inp = last.querySelector('.rule-title-input');
+        if (inp) { inp.focus(); inp.select(); }
+      }
+    }
+    document.getElementById('re-add').addEventListener('click', addRule);
+    document.getElementById('re-add2').addEventListener('click', addRule);
+
+    // Copy all
+    document.getElementById('re-copy').addEventListener('click', () => {
+      const text = rules
+        .filter(r => r.enabled)
+        .map(r => `# === ${r.title} ===\n${r.body}`)
+        .join('\n\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('re-copy');
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+        btn.classList.add('success');
+        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('success'); }, 1800);
+      });
+    });
+
+    // Reset defaults
+    document.getElementById('re-reset').addEventListener('click', () => {
+      if (confirm('Reset all rules to defaults? Your custom rules will be lost.')) {
+        rules = JSON.parse(JSON.stringify(DEFAULT_RULES));
+        saveRules(rules);
+        render();
+      }
+    });
+
+    // Auto-grow all textareas on open
+    document.querySelectorAll('.rule-textarea').forEach(ta => {
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+    });
+  }
+
+  openModal('Fraud Detection Rules', '');
+  render();
+}
+</script>
+</body>
+</html>
