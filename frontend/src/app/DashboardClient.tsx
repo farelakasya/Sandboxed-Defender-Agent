@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTicketStore } from "@/stores/ticket.store";
 import { useHydrated } from "@/stores/useHydrated";
 import { SecurityTicket } from "@/lib/ticket.types";
+import type { Severity, DefenderAction } from "@/lib/ticket.types";
 import { useMockData } from "@/lib/api-client";
 import { getTicketPageFromBackend } from "@/lib/tickets.backend.service";
 import {
@@ -21,7 +22,6 @@ import {
   calculateDashboardMetrics,
   calculateQueueHealth,
   getSeverityDistribution,
-  getHighRiskShareOfActive,
   getAttackTypeDistribution,
   getDetectionTypeDistribution,
   getAutomatedDefenseSummary,
@@ -153,16 +153,59 @@ export function DashboardClient() {
       };
     });
 
-    // Prefer DB-wide backend aggregates when available; otherwise derive from
-    // the loaded ticket sample (unchanged legacy behavior / mock mode).
+    // ── Single source of truth for KPI + Risk Breakdown numbers ───────────
+    // Prefer DB-wide distributions; in mock mode (or if the endpoint is down)
+    // derive the SAME shape from the loaded tickets so both stay consistent.
+    const severity =
+      distributions && distributions.bySeverity.length > 0
+        ? distributions.bySeverity
+        : getSeverityDistribution(tickets);
+    const defense =
+      distributions && distributions.defense.length > 0
+        ? distributions.defense
+        : getAutomatedDefenseSummary(tickets);
+
+    const sevCount = (s: Severity) =>
+      severity.find((d) => d.severity === s)?.count ?? 0;
+    const actionCount = (a: DefenderAction) =>
+      defense.find((d) => d.action === a)?.count ?? 0;
+
+    // Detection Volume = sum of all severity buckets (the donut total).
+    const detectionVolume =
+      sevCount("CRITICAL") + sevCount("HIGH") + sevCount("MEDIUM") + sevCount("LOW");
+    // High-Risk = CRITICAL + HIGH only (NOT medium).
+    const highRiskTickets = sevCount("CRITICAL") + sevCount("HIGH");
+    const highRiskPct =
+      detectionVolume > 0
+        ? Math.round((highRiskTickets / detectionVolume) * 100)
+        : 0;
+    // Defender Actions = block_ip + flag_user + rate_limit_ip (excludes "none").
+    const defenderActions =
+      actionCount("block_ip") +
+      actionCount("flag_user") +
+      actionCount("rate_limit_ip");
+    const blockedActions = actionCount("block_ip");
+
+    const kpiStats = {
+      detectionVolume,
+      highRiskTickets,
+      autoContained: metrics.autoContained,
+      defenderActions,
+      blockedActions,
+    };
+
     return {
       metrics,
-      queueHealth: effectiveQueueHealth,
-      severity:
-        distributions && distributions.bySeverity.length > 0
-          ? distributions.bySeverity
-          : getSeverityDistribution(tickets),
-      highRiskShare: getHighRiskShareOfActive(tickets),
+      kpiStats,
+      detectionVolume,
+      highRiskTickets,
+      highRiskPct,
+      // Queue Health uses the same high-risk definition as the KPI card.
+      queueHealth: {
+        ...effectiveQueueHealth,
+        metrics: { ...effectiveQueueHealth.metrics, highRiskTickets },
+      },
+      severity,
       attackTypes:
         backendPerIpDistribution.length > 0
           ? backendPerIpDistribution
@@ -171,10 +214,7 @@ export function DashboardClient() {
         distributions && distributions.detectionTypes.byType.length > 0
           ? distributions.detectionTypes
           : getDetectionTypeDistribution(tickets),
-      defense:
-        distributions && distributions.defense.length > 0
-          ? distributions.defense
-          : getAutomatedDefenseSummary(tickets),
+      defense,
       latestHighRisk: getLatestHighRiskTickets(tickets, 5),
       timeline:
         backendTimeline && backendTimeline.length > 0
@@ -207,7 +247,7 @@ export function DashboardClient() {
       />
 
       <DashboardKPICards
-        metrics={derived.metrics}
+        stats={derived.kpiStats}
         queueHealth={derived.queueHealth}
       />
 
@@ -222,8 +262,8 @@ export function DashboardClient() {
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <SeverityDonut
           distribution={derived.severity}
-          total={derived.metrics.totalTickets}
-          highRiskShare={derived.highRiskShare}
+          total={derived.detectionVolume}
+          highRiskPct={derived.highRiskPct}
         />
         <AttackTypeDistribution
           distribution={derived.attackTypes}

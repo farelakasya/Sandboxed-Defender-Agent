@@ -406,6 +406,14 @@ export function normalizeBackendTicketToSecurityTicket(rawTicket: unknown): Secu
   const endpoint = asString(raw.affected_endpoint, "/");
   const createdAt = asString(raw.created_at, now);
   const updatedAt = asString(raw.updated_at, createdAt);
+  // Detection timestamp priority: detected_at > attack_timestamp > timestamp
+  // > created_at > updated_at. Only non-empty string fields are considered.
+  const detectedAt =
+    asString(raw.detected_at, "") ||
+    asString(raw.attack_timestamp, "") ||
+    asString(raw.timestamp, "") ||
+    createdAt ||
+    updatedAt;
 
   const status = normalizeStatus(raw.status);
   const defenderAction = normalizeDefenderAction(raw.defender_action);
@@ -430,6 +438,7 @@ export function normalizeBackendTicketToSecurityTicket(rawTicket: unknown): Secu
     status,
     created_at: createdAt,
     updated_at: updatedAt,
+    detected_at: detectedAt,
     first_seen: asString(raw.first_seen, createdAt),
     last_seen: asString(raw.last_seen, updatedAt),
     attack_type: asString(

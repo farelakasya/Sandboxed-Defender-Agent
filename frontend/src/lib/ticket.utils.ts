@@ -168,6 +168,30 @@ export function formatTime(value: string): string {
   )}`;
 }
 
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "Jun 10, 2026, 03:48 UTC" — UTC to match the rest of the app; "—" if missing/invalid. */
+export function formatDetectedAt(value?: string): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}, ${pad(
+    d.getUTCHours()
+  )}:${pad(d.getUTCMinutes())} UTC`;
+}
+
+/** Detection timestamp as epoch ms (detected_at, else created_at); null if missing/invalid. */
+export function getDetectedAtMs(t: SecurityTicket): number | null {
+  const value = t.detected_at || t.created_at;
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 /** Human "x minutes ago" relative time. */
 export function formatRelativeTime(value: string): string {
   const d = new Date(value);

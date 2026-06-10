@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Layers, Check, Minus, Users } from "lucide-react";
+import { Layers, Check, Minus, Users, ArrowDown, ArrowUp } from "lucide-react";
 import { SecurityTicket } from "@/lib/ticket.types";
 import {
   formatActorType,
+  formatDetectedAt,
   formatRelativeTime,
   formatSource,
   getRiskScoreColor,
@@ -20,6 +21,10 @@ interface Props {
   tickets: SecurityTicket[];
   /** ids that should briefly highlight (newly added). */
   highlightedIds?: string[];
+  /** Current Detected At sort direction (desc = newest first). */
+  sortOrder?: "asc" | "desc";
+  /** Toggle the Detected At sort direction. */
+  onToggleSort?: () => void;
 }
 
 const COLUMNS = [
@@ -34,10 +39,16 @@ const COLUMNS = [
   "AI Action",
   "Status",
   "Risk",
+  "Detected At",
   "Last Seen",
 ];
 
-export function TicketTable({ tickets, highlightedIds = [] }: Props) {
+export function TicketTable({
+  tickets,
+  highlightedIds = [],
+  sortOrder = "desc",
+  onToggleSort,
+}: Props) {
   const router = useRouter();
 
   return (
@@ -45,11 +56,32 @@ export function TicketTable({ tickets, highlightedIds = [] }: Props) {
       <table className="w-full min-w-[1100px] text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            {COLUMNS.map((c) => (
-              <th key={c} className="whitespace-nowrap px-3 py-2.5 font-medium">
-                {c}
-              </th>
-            ))}
+            {COLUMNS.map((c) =>
+              c === "Detected At" && onToggleSort ? (
+                <th key={c} className="whitespace-nowrap px-3 py-2.5 font-medium">
+                  <button
+                    onClick={onToggleSort}
+                    className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground"
+                    title={
+                      sortOrder === "desc"
+                        ? "Sorted newest first — click for oldest first"
+                        : "Sorted oldest first — click for newest first"
+                    }
+                  >
+                    {c}
+                    {sortOrder === "desc" ? (
+                      <ArrowDown className="size-3" />
+                    ) : (
+                      <ArrowUp className="size-3" />
+                    )}
+                  </button>
+                </th>
+              ) : (
+                <th key={c} className="whitespace-nowrap px-3 py-2.5 font-medium">
+                  {c}
+                </th>
+              )
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -153,6 +185,12 @@ export function TicketTable({ tickets, highlightedIds = [] }: Props) {
                     )}
                   >
                     {t.risk_score}
+                  </td>
+                  <td
+                    className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground"
+                    title={t.detected_at ?? t.created_at}
+                  >
+                    {formatDetectedAt(t.detected_at ?? t.created_at)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">
                     {formatRelativeTime(t.last_seen)}
