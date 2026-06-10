@@ -1,5 +1,63 @@
 # Testing Agent / Attacker App Backend Contract
 
+> ⚠️ **CURRENT contract (Tier2 AI-Pentest) — read this; the sections below it are
+> historical and describe the old multi-vector/fraud assumption that no longer
+> applies.**
+
+## Tier2 AI-Pentest backend (current)
+
+A single async AI-pentest backend. **No** domains, vector catalog, fraud,
+synchronous report, callbacks, ticket correlation, options/max_steps/safe_mode.
+Opus chooses techniques at runtime.
+
+**Flow:** launch a scan against an authorized target → get `scan_id` → poll
+until terminal. The browser only calls this app's routes; the proxy adds the API
+key server-side.
+
+```
+Browser → POST /api/testing/launch              { ip, port, endpoint, authorized:true }
+        → external: POST {ATTACKER_APP_BASE_URL}{ATTACKER_APP_SCAN_PATH}   header x-api-key
+        ← 202 { scan_id, status:"QUEUED" }
+Browser → GET /api/testing/scan/:scan_id        (poll every ~15s)
+        → external: GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
+        ← Scan object (status QUEUED→RUNNING→DONE/FAILED/REJECTED)
+```
+
+Env (server-only; key never `NEXT_PUBLIC_`, never logged):
+
+```
+TESTING_AGENT_MODE=external
+ATTACKER_APP_BASE_URL=https://r578qyt8l2.execute-api.us-east-1.amazonaws.com/prod
+ATTACKER_APP_SCAN_PATH=/scan
+ATTACKER_APP_API_KEY=<set in env / Vercel only>
+ATTACKER_APP_AUTH_HEADER=x-api-key
+```
+
+- **Launch body:** `{ ip: string, port: 1–65535, endpoint: "/...", authorized: true }`
+  (validated server-side; `authorized` must be exactly `true`).
+- **Scan object:** `scan_id, status, engine, target{ip,port,endpoint,url},
+  profile|null, scenario|null, report_url|null, error|null, created_at, findings[]`.
+- **Statuses:** `QUEUED | RUNNING | DONE | FAILED | REJECTED` (last three terminal).
+- **Polling:** every ~15s; stop on terminal; transient poll errors back off and
+  keep the `scan_id` (run not lost).
+- **Severities:** lowercase (`critical|high|medium|low|info`).
+- **Targets:** backend builds `http://ip:port`; HTTPS targets unsupported. Targets
+  are allowlisted server-side; off-allowlist → `REJECTED`.
+- **No fraud launch.** Defender fraud/anomaly data on the dashboard/tickets comes
+  from the defender DB and is unrelated to this backend.
+- **No report→ticket correlation** (no `mapped_ticket_id` / `linked_ticket_ids` /
+  `defender_result`).
+- **Errors:** proxy returns clean JSON — `404 not_found`, `403 forbidden`,
+  `400 validation_error`, `502` upstream — never the key, headers, or stack traces.
+
+---
+
+## (Historical) Stage 2–3 multi-vector / fraud assumption
+
+> The text below predates the Tier2 contract. The `/launch` path, AgentCommand
+> body, `domain`/`vector_id`/`safe_mode`, synchronous report, and fraud support
+> described here are **no longer used**. Kept for history only.
+
 > How the Sandboxed Defender app talks to the collaborator backend that runs the
 > attack/fraud simulation agents (Bedrock / Lambda / custom). **Safe simulation
 > only** — `safe_mode` is always forced true; no real credentials/payment.
