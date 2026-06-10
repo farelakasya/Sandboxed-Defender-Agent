@@ -12,6 +12,12 @@ import {
   PerIpBreakdown,
 } from "@/lib/dashboard.backend.service";
 import {
+  getDashboardDistributionsFromBackend,
+  getDashboardTimelineFromBackend,
+  type DashboardDistributions,
+} from "@/lib/dashboard-aggregates.backend.service";
+import type { DefenseFeedItem } from "@/lib/dashboard.utils";
+import {
   calculateDashboardMetrics,
   calculateQueueHealth,
   getSeverityDistribution,
@@ -59,6 +65,13 @@ export function DashboardClient() {
   );
   const [perIpBreakdown, setPerIpBreakdown] = useState<PerIpBreakdown[]>([]);
   const [backendUnavailable, setBackendUnavailable] = useState(false);
+  // DB-wide aggregates (null until the backend ships these endpoints; the
+  // dashboard falls back to client-side derivation when null).
+  const [distributions, setDistributions] =
+    useState<DashboardDistributions | null>(null);
+  const [backendTimeline, setBackendTimeline] = useState<DefenseFeedItem[] | null>(
+    null
+  );
 
   // Until the persisted store hydrates on the client, derive against an empty
   // list so server/client markup stays consistent.
@@ -70,15 +83,20 @@ export function DashboardClient() {
 
     async function loadDashboard() {
       try {
-        const [metrics, perIp, page] = await Promise.all([
+        const [metrics, perIp, page, dist, timeline] = await Promise.all([
           getDashboardMetricsFromBackend(),
           getPerIpBreakdownFromBackend(20),
           getTicketPageFromBackend({ limit: 50, offset: 0 }),
+          // Optional DB-wide aggregates — resolve to null if not yet available.
+          getDashboardDistributionsFromBackend(),
+          getDashboardTimelineFromBackend(8),
         ]);
         if (cancelled) return;
         setBackendMetrics(metrics);
         setPerIpBreakdown(perIp);
         setBackendTickets(page.tickets);
+        setDistributions(dist);
+        setBackendTimeline(timeline);
         setBackendUnavailable(false);
       } catch (err) {
         if (cancelled) return;
@@ -87,6 +105,8 @@ export function DashboardClient() {
         setBackendMetrics(null);
         setPerIpBreakdown([]);
         setBackendTickets([]);
+        setDistributions(null);
+        setBackendTimeline(null);
       }
     }
 
@@ -133,23 +153,43 @@ export function DashboardClient() {
       };
     });
 
+    // Prefer DB-wide backend aggregates when available; otherwise derive from
+    // the loaded ticket sample (unchanged legacy behavior / mock mode).
     return {
       metrics,
       queueHealth: effectiveQueueHealth,
-      severity: getSeverityDistribution(tickets),
+      severity:
+        distributions && distributions.bySeverity.length > 0
+          ? distributions.bySeverity
+          : getSeverityDistribution(tickets),
       highRiskShare: getHighRiskShareOfActive(tickets),
       attackTypes:
         backendPerIpDistribution.length > 0
           ? backendPerIpDistribution
           : getAttackTypeDistribution(tickets),
-      detectionTypes: getDetectionTypeDistribution(tickets),
-      defense: getAutomatedDefenseSummary(tickets),
+      detectionTypes:
+        distributions && distributions.detectionTypes.byType.length > 0
+          ? distributions.detectionTypes
+          : getDetectionTypeDistribution(tickets),
+      defense:
+        distributions && distributions.defense.length > 0
+          ? distributions.defense
+          : getAutomatedDefenseSummary(tickets),
       latestHighRisk: getLatestHighRiskTickets(tickets, 5),
-      timeline: getLiveDefenseTimeline(tickets, 8),
-      topEndpoints: getTopAttackedEndpoints(tickets, 5),
-      fixes: getRecommendedFixesSummary(tickets, 6),
+      timeline:
+        backendTimeline && backendTimeline.length > 0
+          ? backendTimeline
+          : getLiveDefenseTimeline(tickets, 8),
+      topEndpoints:
+        distributions && distributions.topEndpoints.length > 0
+          ? distributions.topEndpoints.slice(0, 5)
+          : getTopAttackedEndpoints(tickets, 5),
+      fixes:
+        distributions && distributions.fixes.length > 0
+          ? distributions.fixes.slice(0, 6)
+          : getRecommendedFixesSummary(tickets, 6),
     };
-  }, [backendMetrics, perIpBreakdown, tickets]);
+  }, [backendMetrics, perIpBreakdown, tickets, distributions, backendTimeline]);
 
   const backendStatus = mockMode
     ? "mock"
