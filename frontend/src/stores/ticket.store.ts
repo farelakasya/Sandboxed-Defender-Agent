@@ -9,6 +9,13 @@ import {
   TicketStatus,
 } from "@/lib/ticket.types";
 import { createSimulatedTicket } from "@/lib/ticket.factory";
+import { SimulationIncidentEvent } from "@/lib/simulation.types";
+import {
+  buildEvidenceLog,
+  dedupKeyForEvent,
+  dedupKeyForTicket,
+  normalizeSimulationEventToTicket,
+} from "@/lib/simulation-to-ticket.adapter";
 
 /**
  * Global client-side ticket store (demo MVP — no real database).
@@ -68,8 +75,19 @@ interface TicketState {
   reopenTicket: (ticketId: string) => void;
   simulateNewTicket: () => SecurityTicket | undefined;
   simulateOverload: () => SecurityTicket | undefined;
+  /**
+   * Create or update a ticket from a simulator event. Dedups against unresolved
+   * tickets by attack_type + affected_endpoint + source_ip (NOT ticket_id).
+   * Returns the affected ticket and whether it was newly created.
+   */
+  upsertTicketFromSimulation: (
+    event: SimulationIncidentEvent
+  ) => { ticket: SecurityTicket; created: boolean };
   resetMockData: () => void;
 }
+
+/** Statuses that are "closed" and must not be mutated by upsert. */
+const RESOLVED_STATUSES: TicketStatus[] = ["resolved", "false_positive"];
 
 /**
  * Immutably map over tickets, replacing the one matching `ticketId` with the
@@ -240,6 +258,53 @@ export const useTicketStore = create<TicketState>()(
             : [updatedCampaign, ...state.tickets],
         }));
         return updatedCampaign;
+      },
+
+      // TODO(api): replace with POST /api/tickets/from-simulation; the backend
+      // should perform the same normalize + upsert and return the ticket.
+      upsertTicketFromSimulation: (event) => {
+        const ts = nowIso();
+        const key = dedupKeyForEvent(event);
+
+        // Find an existing UNRESOLVED ticket with the same dedup key.
+        const existing = get().tickets.find(
+          (t) =>
+            !RESOLVED_STATUSES.includes(t.status) &&
+            dedupKeyForTicket(t) === key
+        );
+
+        if (existing) {
+          // Update in place: append evidence, bump count, refresh timestamps.
+          const newEvidence = buildEvidenceLog(event);
+          const updated: SecurityTicket = {
+            ...existing,
+            request_count: existing.request_count + 1,
+            last_seen: event.timestamp,
+            updated_at: ts,
+            // A repeat breach on a contained ticket re-opens it for review.
+            status:
+              event.outcome === "breached" &&
+              existing.status === "auto_contained"
+                ? "needs_review"
+                : existing.status,
+            evidence_logs: [...existing.evidence_logs, newEvidence],
+            activity: [
+              ...existing.activity,
+              makeActivity("System", "Ticket updated from simulator event."),
+            ],
+          };
+          set((state) => ({
+            tickets: state.tickets.map((t) =>
+              t.ticket_id === existing.ticket_id ? updated : t
+            ),
+          }));
+          return { ticket: updated, created: false };
+        }
+
+        // No match — create a brand-new ticket (unique ticket_id).
+        const created = normalizeSimulationEventToTicket(event);
+        set((state) => ({ tickets: [created, ...state.tickets] }));
+        return { ticket: created, created: true };
       },
 
       resetMockData: () =>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 
 export const metadata: Metadata = {
   title: "Sandboxed Defender — Security Tickets",
@@ -18,7 +19,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background bg-grid antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <div className="flex min-h-screen">
+            <AppSidebar />
+            <main className="min-w-0 flex-1">{children}</main>
+          </div>
+        </ToastProvider>
       </body>
     </html>
   );

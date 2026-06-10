@@ -1,6 +1,10 @@
-import { redirect } from "next/navigation";
+import { DashboardClient } from "./DashboardClient";
 
-/** Land on the ticket queue for the demo. */
+/**
+ * Dashboard landing page — "/".
+ * The bare-minimum overview with KPIs and links to each feature. Replaces the
+ * old redirect so "/" is a real page.
+ */
 export default function Home() {
-  redirect("/security/tickets");
+  return <DashboardClient />;
 }
