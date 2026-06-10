@@ -8,9 +8,13 @@
  *   4. mock mode  → synthesize a DetectionEvent, store it, return success
  *      external   → forward the AgentCommand to the collaborator backend
  *
- * Secrets are server-only: ATTACKER_APP_BASE_URL / ATTACKER_APP_API_KEY (or the
- * legacy TESTING_AGENT_BACKEND_URL / TESTING_AGENT_API_KEY). The browser never
- * talks to the attacker app / AWS directly — it only calls this route.
+ * Server-only env (never NEXT_PUBLIC_, never logged):
+ *   ATTACKER_APP_BASE_URL     base URL of the attacker backend (e.g. API Gateway)
+ *   ATTACKER_APP_LAUNCH_PATH  launch path under the base (default "/launch")
+ *   ATTACKER_APP_API_KEY      API key sent as a header (style below)
+ *   ATTACKER_APP_AUTH_HEADER  "x-api-key" (default, API Gateway) | "bearer"
+ *   legacy fallbacks: TESTING_AGENT_BACKEND_URL / TESTING_AGENT_API_KEY
+ * The browser never talks to the attacker app / AWS directly — only this route.
  */
 import { NextResponse } from "next/server";
 import {
@@ -147,13 +151,65 @@ export async function POST(req: Request) {
   const { provider } = getAgentForVector(vector);
   const apiKey =
     process.env.ATTACKER_APP_API_KEY ?? process.env.TESTING_AGENT_API_KEY;
+
+  // Auth header style — the real attacker backend is AWS API Gateway, which
+  // expects `x-api-key` by default. `bearer` sends `Authorization: Bearer`.
+  // Aliases accepted, documented values are `x-api-key` and `bearer`.
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };
-  if (apiKey) headers["authorization"] = `Bearer ${apiKey}`;
+  if (apiKey) {
+    const authStyle = (process.env.ATTACKER_APP_AUTH_HEADER ?? "x-api-key")
+      .trim()
+      .toLowerCase();
+    if (authStyle === "bearer") {
+      headers["authorization"] = `Bearer ${apiKey}`;
+    } else {
+      // x-api-key | apikey | api-key (and any other value) → API Gateway style.
+      headers["x-api-key"] = apiKey;
+    }
+  } else {
+    // The backend may not require a key; proceed but note it server-side only.
+    console.warn(
+      "[testing/launch] external mode: no ATTACKER_APP_API_KEY configured — sending unauthenticated request."
+    );
+  }
+
+  // Configurable launch path (default /launch). Built safely against the base so
+  // the API Gateway stage prefix in the base URL is preserved.
+  const launchPath = process.env.ATTACKER_APP_LAUNCH_PATH ?? "/launch";
+  const normalizedBase = backendUrl.endsWith("/") ? backendUrl : `${backendUrl}/`;
+  let launchUrl: string;
+  try {
+    launchUrl = new URL(launchPath.replace(/^\//, ""), normalizedBase).toString();
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        run_id: runId,
+        status: "failed",
+        provider,
+        message:
+          "ATTACKER_APP_BASE_URL is not a valid URL. Fix the base URL configuration.",
+        error: "invalid_backend_url",
+        command_preview: command,
+      } satisfies SimulationLaunchResponse,
+      { status: 500 }
+    );
+  }
+
+  // Safe descriptor for error messages: hostname + path only, never the key,
+  // query string, or headers.
+  let safeTarget = "attacker backend";
+  try {
+    const u = new URL(launchUrl);
+    safeTarget = `${u.hostname}${u.pathname}`;
+  } catch {
+    /* keep default */
+  }
 
   try {
-    const upstream = await fetch(`${backendUrl.replace(/\/$/, "")}/launch`, {
+    const upstream = await fetch(launchUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(command),
@@ -163,15 +219,24 @@ export async function POST(req: Request) {
     const data = await upstream.json().catch(() => ({}));
 
     if (!upstream.ok) {
+      // Surface the upstream status safely. 404 → likely wrong launch path;
+      // 403 → likely wrong auth header / key. Never echo the key or headers.
+      const hint =
+        upstream.status === 404
+          ? " (check ATTACKER_APP_LAUNCH_PATH)"
+          : upstream.status === 403 || upstream.status === 401
+          ? " (check ATTACKER_APP_AUTH_HEADER / API key)"
+          : "";
       return NextResponse.json(
         {
           ok: false,
           run_id: runId,
           status: "failed",
-          provider,
-          message: `collaborator backend returned ${upstream.status}`,
+          provider: "collaborator_api",
+          message: `Attacker backend ${safeTarget} returned ${upstream.status}${hint}.`,
           error: `upstream_${upstream.status}`,
           command_preview: command,
+          result: data,
         } satisfies SimulationLaunchResponse,
         { status: 502 }
       );
@@ -214,13 +279,15 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (err) {
+    // Network/DNS/timeout — no upstream status. Log the error name only.
+    console.error("[testing/launch] external fetch failed:", err instanceof Error ? err.name : "unknown");
     return NextResponse.json(
       {
         ok: false,
         run_id: runId,
         status: "failed",
-        provider,
-        message: "could not reach the collaborator backend",
+        provider: "collaborator_api",
+        message: `Could not reach the attacker backend ${safeTarget}.`,
         error: err instanceof Error ? err.name : "fetch_failed",
         command_preview: command,
       } satisfies SimulationLaunchResponse,
