@@ -9,10 +9,34 @@
 - The **browser only calls `/api/testing/launch`** (this app's own route). It
   never calls the attacker app, AWS, or Bedrock directly.
 - That route reads the **server-side** API key and forwards to the attacker app.
-- Env vars (server-only; keys are **never** `NEXT_PUBLIC_`):
+- Env vars (server-only; keys are **never** `NEXT_PUBLIC_`, never logged):
   - `TESTING_AGENT_MODE` = `mock` | `external`
   - `ATTACKER_APP_BASE_URL` (or legacy `TESTING_AGENT_BACKEND_URL`)
+  - `ATTACKER_APP_LAUNCH_PATH` = path under the base, default `/launch`
   - `ATTACKER_APP_API_KEY` (or legacy `TESTING_AGENT_API_KEY`)
+  - `ATTACKER_APP_AUTH_HEADER` = `x-api-key` (default, AWS API Gateway) | `bearer`
+
+### Connecting the real attacker backend (AWS API Gateway)
+
+Set these server-side (locally in `.env.local`, on deploys in Vercel env — never
+commit the key, never use `NEXT_PUBLIC_`):
+
+```
+TESTING_AGENT_MODE=external
+ATTACKER_APP_BASE_URL=https://r578qyt8l2.execute-api.us-east-1.amazonaws.com/prod
+ATTACKER_APP_LAUNCH_PATH=/launch
+ATTACKER_APP_API_KEY=<set in Vercel only>
+ATTACKER_APP_AUTH_HEADER=x-api-key
+```
+
+The route forwards to `${ATTACKER_APP_BASE_URL}${ATTACKER_APP_LAUNCH_PATH}`
+(the API Gateway stage prefix in the base is preserved) with the key in the
+`x-api-key` header. Troubleshooting:
+- **404** → `ATTACKER_APP_LAUNCH_PATH` is likely wrong; confirm the exact launch
+  path with the teammate and update the env var only (no code change).
+- **401/403** → check `ATTACKER_APP_AUTH_HEADER` and the key.
+- **422/400** → request body schema mismatch; confirm the expected body before
+  changing the `AgentCommand` shape.
 - **Mock mode** works with no attacker app: the launch pages render a synthesized
   `AttackerReport` (see `src/lib/attacker-report.types.ts`).
 - **External mode** requires `ATTACKER_APP_BASE_URL`; the bearer key is sent only
