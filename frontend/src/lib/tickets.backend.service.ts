@@ -12,6 +12,12 @@ import type {
   TicketStatus,
   TimelineEvent,
 } from "./ticket.types";
+import type {
+  DeveloperNotification,
+  FixRecommendation,
+  MitigationAction,
+  MitigationActionType,
+} from "./detectionEvent.types";
 
 type BackendTicketListResponse =
   | SecurityTicket[]
@@ -145,11 +151,15 @@ function normalizeSource(value: unknown): SecurityTicket["source"] {
     v === "combined" ||
     v === "lambda" ||
     v === "fraud_sim" ||
-    v === "simulation"
+    v === "simulation" ||
+    v === "agent-analyzer"
   ) {
     return v;
   }
-  return "combined";
+  // Preserve any other backend-supplied source verbatim instead of flattening
+  // it to "combined" (the cast keeps the named union as an editor hint).
+  return (String(value ?? "").trim() ||
+    "combined") as SecurityTicket["source"];
 }
 
 function normalizeMeasure(item: unknown, index: number): AutomatedMeasure {
@@ -194,11 +204,167 @@ function normalizeAction(item: unknown, index: number): RecommendedAction {
     id: asString(raw.id, `action-${index}`),
     priority: normalizeActionPriority(raw.priority),
     title: asString(raw.title, "Review detection"),
-    category: "Monitoring",
+    // Preserve the backend category (e.g. "hardening") instead of overwriting it.
+    category: asString(raw.category, "Monitoring"),
     why_it_matters: asString(raw.why_it_matters, "This verdict may require follow-up."),
     suggested_fix: asString(raw.suggested_fix, "Review the event context and tune controls if needed."),
     status: normalizeActionStatus(raw.status),
   };
+}
+
+/** Map a RecommendedAction into the structured FixRecommendation shape. */
+function actionToFixRecommendation(action: RecommendedAction): FixRecommendation {
+  return {
+    id: action.id,
+    title: action.title,
+    priority: action.priority,
+    category: action.category,
+    why_it_matters: action.why_it_matters,
+    suggested_fix: action.suggested_fix,
+    status: action.status,
+  };
+}
+
+/**
+ * Derive mitigation actions from whatever the backend exposes. Prefers an
+ * explicit `mitigation_actions` array; otherwise reconstructs from
+ * `automated_measures` + `defender_action`. Never invents actions that aren't
+ * supported by backend data.
+ */
+function deriveMitigationActions(
+  raw: Record<string, unknown>,
+  defenderAction: DefenderAction,
+  measures: AutomatedMeasure[]
+): MitigationAction[] {
+  // 1. Explicit backend field wins.
+  if (Array.isArray(raw.mitigation_actions)) {
+    return raw.mitigation_actions.map((item) => {
+      const m = asRecord(item);
+      return {
+        action: normalizeMitigationActionType(m.action),
+        status:
+          m.status === "pending" || m.status === "failed"
+            ? m.status
+            : "completed",
+        timestamp: asString(m.timestamp, new Date().toISOString()),
+        reason: asString(m.reason, ""),
+      };
+    });
+  }
+
+  // 2. Reconstruct from automated measures (each measure ≈ a mitigation step).
+  const fromMeasures: MitigationAction[] = measures.map((measure) => ({
+    action: defenderAction === "none" ? "none" : (defenderAction as MitigationActionType),
+    status: measure.status,
+    timestamp: measure.timestamp,
+    reason: measure.description || measure.name,
+  }));
+  if (fromMeasures.length > 0) return fromMeasures;
+
+  // 3. Fall back to the single defender action, if one was taken.
+  if (defenderAction !== "none") {
+    return [
+      {
+        action: defenderAction as MitigationActionType,
+        status: "completed",
+        timestamp: new Date().toISOString(),
+        reason: "Automated defender action.",
+      },
+    ];
+  }
+  return [];
+}
+
+function normalizeMitigationActionType(value: unknown): MitigationActionType {
+  const v = String(value ?? "").toLowerCase();
+  if (
+    v === "block_ip" ||
+    v === "rate_limit_ip" ||
+    v === "flag_user" ||
+    v === "disable_account" ||
+    v === "suspend_export" ||
+    v === "notify_dev" ||
+    v === "notify_admin"
+  ) {
+    return v;
+  }
+  return "none";
+}
+
+/**
+ * Derive containment status from the backend. Prefers an explicit field; else
+ * infers from status/action (auto-contained or an action taken → contained;
+ * still ongoing/needs review → pending).
+ */
+function deriveContainmentStatus(
+  raw: Record<string, unknown>,
+  status: TicketStatus,
+  actionTaken: boolean
+): SecurityTicket["containment_status"] {
+  const explicit = raw.containment_status;
+  if (
+    explicit === "contained" ||
+    explicit === "partial" ||
+    explicit === "not_contained" ||
+    explicit === "pending"
+  ) {
+    return explicit;
+  }
+  if (status === "auto_contained") return "contained";
+  if (status === "false_positive" || status === "resolved") return "contained";
+  if (actionTaken) return "contained";
+  if (status === "needs_review" || status === "new" || status === "investigating") {
+    return "pending";
+  }
+  return undefined;
+}
+
+/**
+ * Derive a developer-notification status. Prefers an explicit backend object;
+ * else infers from `defender_action` / `action_taken`: notify_* actions or any
+ * automated action implies the on-call workflow was triggered (dashboard
+ * channel). If nothing was actioned, notification is not required.
+ */
+function deriveDeveloperNotification(
+  raw: Record<string, unknown>,
+  defenderAction: DefenderAction,
+  actionTaken: boolean,
+  timestamp: string
+): DeveloperNotification {
+  const explicit = asRecord(raw.developer_notification);
+  if (typeof explicit.status === "string") {
+    const status = explicit.status as DeveloperNotification["status"];
+    return {
+      status:
+        status === "sent" ||
+        status === "pending" ||
+        status === "failed" ||
+        status === "not_required"
+          ? status
+          : "sent",
+      channel:
+        explicit.channel === "email" ||
+        explicit.channel === "slack" ||
+        explicit.channel === "dashboard" ||
+        explicit.channel === "mock"
+          ? explicit.channel
+          : "dashboard",
+      recipient: asString(explicit.recipient, "") || undefined,
+      timestamp: asString(explicit.timestamp, timestamp),
+    };
+  }
+
+  const notifying =
+    defenderAction === "notify_dev" || defenderAction === "notify_admin";
+  if (notifying || actionTaken) {
+    return {
+      status: "sent",
+      channel: "dashboard",
+      recipient: asString(raw.assigned_team, "") || undefined,
+      timestamp,
+    };
+  }
+  return { status: "not_required", channel: "dashboard", timestamp };
 }
 
 function normalizeActivity(item: unknown, index: number): TicketActivityItem {
@@ -228,13 +394,27 @@ export function normalizeBackendTicketToSecurityTicket(rawTicket: unknown): Secu
   const createdAt = asString(raw.created_at, now);
   const updatedAt = asString(raw.updated_at, createdAt);
 
+  const status = normalizeStatus(raw.status);
+  const defenderAction = normalizeDefenderAction(raw.defender_action);
+  const actionTaken = asBoolean(raw.action_taken, false);
+  const measures = asArray(raw.automated_measures, normalizeMeasure);
+  const recommendedActions = asArray(raw.recommended_actions, normalizeAction);
+  // Backend sends a free-text analyzer narrative as `ai_analysis`.
+  const aiAnalysis = asString(raw.ai_analysis, "Backend verdict loaded.");
+  // Prefer an explicit `recommended_fixes` array; else reuse recommended_actions.
+  const fixes: FixRecommendation[] = Array.isArray(raw.recommended_fixes)
+    ? raw.recommended_fixes.map((item, i) =>
+        actionToFixRecommendation(normalizeAction(item, i))
+      )
+    : recommendedActions.map(actionToFixRecommendation);
+
   return {
     ticket_id: ticketId,
     title: asString(raw.title, "Detection ticket"),
     severity: normalizeSeverity(raw.severity),
     priority: normalizePriority(raw.priority, riskScore),
     risk_score: riskScore,
-    status: normalizeStatus(raw.status),
+    status,
     created_at: createdAt,
     updated_at: updatedAt,
     first_seen: asString(raw.first_seen, createdAt),
@@ -255,28 +435,30 @@ export function normalizeBackendTicketToSecurityTicket(rawTicket: unknown): Secu
     request_count: asNumber(raw.request_count, 1),
     detected_by: asString(raw.detected_by, "backend"),
     detection_source: asString(raw.detection_source, "backend verdicts"),
-    automated_measures: asArray(raw.automated_measures, normalizeMeasure),
+    automated_measures: measures,
     evidence_logs: asArray(raw.evidence_logs, normalizeEvidence),
-    recommended_actions: asArray(raw.recommended_actions, normalizeAction),
-    ai_analysis: asString(raw.ai_analysis, "Backend verdict loaded."),
+    recommended_actions: recommendedActions,
+    ai_analysis: aiAnalysis,
     timeline: asArray(raw.timeline, normalizeTimeline),
     activity: asArray(raw.activity, normalizeActivity),
-    defender_action: normalizeDefenderAction(raw.defender_action),
-    action_taken: asBoolean(raw.action_taken, false),
+    defender_action: defenderAction,
+    action_taken: actionTaken,
     assigned_team: asString(raw.assigned_team, "") || undefined,
     sla_due_at: asString(raw.sla_due_at, "") || undefined,
     is_grouped: asBoolean(raw.is_grouped, false),
     grouped_event_count: asNumber(raw.grouped_event_count, 0) || undefined,
     suppressed_event_count: asNumber(raw.suppressed_event_count, 0) || undefined,
-    containment_status:
-      raw.containment_status === "contained" ||
-      raw.containment_status === "partial" ||
-      raw.containment_status === "not_contained" ||
-      raw.containment_status === "pending"
-        ? raw.containment_status
-        : undefined,
-    mitigation_actions: [],
-    recommended_fixes: [],
+    containment_status: deriveContainmentStatus(raw, status, actionTaken),
+    // Preserve/derive the unified detection fields instead of stubbing them.
+    mitigation_actions: deriveMitigationActions(raw, defenderAction, measures),
+    recommended_fixes: fixes,
+    analyzer_summary: aiAnalysis,
+    developer_notification: deriveDeveloperNotification(
+      raw,
+      defenderAction,
+      actionTaken,
+      updatedAt
+    ),
   };
 }
 

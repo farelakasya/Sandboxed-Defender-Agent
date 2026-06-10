@@ -3,7 +3,6 @@
 import {
   CheckCircle2,
   RotateCcw,
-  BellRing,
   FileDown,
   Clock,
   Hash,
@@ -19,7 +18,6 @@ interface Props {
   ticket: SecurityTicket;
   onResolve: () => void;
   onReopen: () => void;
-  onNotify: () => void;
   onExport: () => void;
 }
 
@@ -27,7 +25,6 @@ export function TicketDetailHeader({
   ticket,
   onResolve,
   onReopen,
-  onNotify,
   onExport,
 }: Props) {
   const isResolved =
@@ -68,7 +65,8 @@ export function TicketDetailHeader({
           </div>
         </div>
 
-        {/* Local-state action buttons (no backend yet). */}
+        {/* Developer notification is automatic — no manual notify button.
+            Status is surfaced read-only in NotificationStatusCard. */}
         <div className="flex flex-wrap gap-2">
           {isResolved ? (
             <Button variant="outline" onClick={onReopen}>
@@ -81,10 +79,6 @@ export function TicketDetailHeader({
               Mark as Resolved
             </Button>
           )}
-          <Button variant="outline" onClick={onNotify}>
-            <BellRing />
-            Notify Developer
-          </Button>
           <Button variant="outline" onClick={onExport}>
             <FileDown />
             Export Report

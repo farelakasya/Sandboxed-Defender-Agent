@@ -48,8 +48,10 @@ import {
  * immediately visible on the other. State is persisted to localStorage so it
  * survives refreshes during a demo.
  *
- * TODO(api): replace the action bodies with calls to tickets.service.ts (which
- * will hit the real backend) and treat the store purely as a client cache.
+ * In backend mode the defender backend is the source of truth (see
+ * tickets.backend.service.ts); this store powers MOCK mode and the in-app
+ * simulation/demo cache. The old in-memory tickets.service.ts was removed in
+ * Stage 4 — the store fully superseded it.
  */
 
 const CAMPAIGN_ID = "INC-2026-006";
@@ -93,7 +95,6 @@ interface TicketState {
     status: RecommendedAction["status"]
   ) => void;
   addActivity: (ticketId: string, activityItem: TicketActivityItem) => void;
-  notifyDeveloper: (ticketId: string) => void;
   markResolved: (ticketId: string) => void;
   reopenTicket: (ticketId: string) => void;
   simulateNewTicket: () => SecurityTicket | undefined;
@@ -228,19 +229,6 @@ export const useTicketStore = create<TicketState>()(
           tickets: patchTicket(state.tickets, ticketId, (t) => ({
             ...t,
             activity: [...t.activity, activityItem],
-          })),
-        })),
-
-      notifyDeveloper: (ticketId) =>
-        set((state) => ({
-          tickets: patchTicket(state.tickets, ticketId, (t) => ({
-            ...t,
-            // A "new" ticket moves to needs_review once a human is looped in.
-            status: t.status === "new" ? "needs_review" : t.status,
-            activity: [
-              ...t.activity,
-              makeActivity("AI Defender", "Developer notification sent."),
-            ],
           })),
         })),
 

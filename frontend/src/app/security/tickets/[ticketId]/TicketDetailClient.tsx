@@ -26,6 +26,7 @@ import { AIAnalysisCard } from "@/components/tickets/AIAnalysisCard";
 import { TicketTimeline } from "@/components/tickets/TicketTimeline";
 import { TicketActivity } from "@/components/tickets/TicketActivity";
 import { TicketSidebar } from "@/components/tickets/TicketSidebar";
+import { NotificationStatusCard } from "@/components/tickets/NotificationStatusCard";
 
 /** Cycle todo -> in_progress -> done -> todo for the action toggle. */
 function cycleStatus(s: RecommendedAction["status"]): RecommendedAction["status"] {
@@ -71,7 +72,6 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
   // Store actions (stable references).
   const markResolved = useTicketStore((s) => s.markResolved);
   const reopenTicket = useTicketStore((s) => s.reopenTicket);
-  const notifyDeveloper = useTicketStore((s) => s.notifyDeveloper);
   const updateRecommendedActionStatus = useTicketStore(
     (s) => s.updateRecommendedActionStatus
   );
@@ -198,15 +198,6 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
     toast({ title: "Ticket reopened", description: ticketId });
   }
 
-  function handleNotify() {
-    if (!mockMode) {
-      updateBackendStatus("needs_review", "Developer notified");
-      return;
-    }
-    notifyDeveloper(ticketId);
-    toast({ variant: "alert", title: "Developer notified" });
-  }
-
   function handleExport() {
     if (typeof window === "undefined" || !ticket) return;
     const blob = new Blob([JSON.stringify(ticket, null, 2)], {
@@ -265,7 +256,6 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
         ticket={ticket}
         onResolve={handleResolve}
         onReopen={handleReopen}
-        onNotify={handleNotify}
         onExport={handleExport}
       />
 
@@ -309,13 +299,16 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
           </div>
         </div>
 
-        <TicketSidebar
-          ticket={ticket}
-          onResolve={handleResolve}
-          onReopen={handleReopen}
-          onNotify={handleNotify}
-          onExport={handleExport}
-        />
+        <div className="space-y-4 lg:sticky lg:top-6">
+          <TicketSidebar
+            ticket={ticket}
+            onResolve={handleResolve}
+            onReopen={handleReopen}
+            onExport={handleExport}
+          />
+          {/* Read-only — notification is automatic, no manual action. */}
+          <NotificationStatusCard ticket={ticket} />
+        </div>
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">

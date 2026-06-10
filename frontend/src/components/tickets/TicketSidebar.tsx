@@ -10,7 +10,6 @@ import {
   Timer,
   CheckCircle2,
   RotateCcw,
-  BellRing,
   FileDown,
   Flag,
   AlertOctagon,
@@ -28,7 +27,6 @@ interface Props {
   ticket: SecurityTicket;
   onResolve: () => void;
   onReopen: () => void;
-  onNotify: () => void;
   onExport: () => void;
 }
 
@@ -75,7 +73,6 @@ export function TicketSidebar({
   ticket,
   onResolve,
   onReopen,
-  onNotify,
   onExport,
 }: Props) {
   const countdown = useCountdown(ticket.sla_due_at);
@@ -168,10 +165,6 @@ export function TicketSidebar({
               Mark as Resolved
             </Button>
           )}
-          <Button variant="outline" onClick={onNotify}>
-            <BellRing />
-            Notify Developer
-          </Button>
           <Button variant="outline" onClick={onExport}>
             <FileDown />
             Export Report

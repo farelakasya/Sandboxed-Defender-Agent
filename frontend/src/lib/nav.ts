@@ -44,41 +44,46 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: LayoutDashboard,
       },
       {
-        label: "Tickets",
+        label: "Detection Tickets",
         href: "/security/tickets",
         icon: Ticket,
-        // Keep "Tickets" active on the detail route too.
+        // Keep this active on the detail route too.
         match: ["/security/tickets"],
       },
     ],
   },
   {
-    title: "Simulations",
+    title: "Testing Lab",
     items: [
       {
-        // In-app simulator: emits structured events into the ticket store.
-        label: "Red/Blue Simulation",
+        // In-app red-team launcher: vector → /api/testing/launch → report.
+        label: "Red-Team Launch",
         href: "/simulations/red-blue",
         icon: ShieldAlert,
         match: ["/simulations/red-blue"],
       },
       {
-        // In-app fraud simulator: feeds the unified detection pipeline.
-        label: "Fraud Simulation",
+        // In-app fraud launcher: vector → /api/testing/launch → report.
+        label: "Fraud Launch",
         href: "/testing/fraud",
         icon: CreditCard,
         match: ["/testing/fraud"],
       },
+    ],
+  },
+  {
+    title: "Legacy Simulators",
+    items: [
       {
         // Teammate's original standalone HTML, served as-is from /public.
-        label: "Red/Blue Simulation (raw)",
+        label: "Raw Red/Blue Simulator",
         href: "/red-blue-simulation.html",
         icon: ShieldAlert,
         external: true,
       },
       {
         // Original fraud HTML — static, served from /public, kept untouched.
-        label: "Fraud Simulation (raw)",
+        label: "Raw Fraud Simulator",
         href: "/fraud-simulation.html",
         icon: CreditCard,
         external: true,
