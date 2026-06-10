@@ -1,3 +1,10 @@
+/**
+ * Legacy adapter: Bedrock red-team events → SecurityTicket (used by the Zustand
+ * store's upsertTicketFromRedTeamEvent, mock/demo path only).
+ *
+ * CANONICAL path for new work is the unified detection-pipeline.ts. Kept because
+ * the Bedrock bridge still emits the older RedTeam SimulationIncidentEvent shape.
+ */
 import type {
   AutomatedMeasure,
   EvidenceLog,

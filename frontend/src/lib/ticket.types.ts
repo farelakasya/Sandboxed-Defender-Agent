@@ -65,7 +65,10 @@ export type RecommendedActionCategory =
   | "Audit Logging"
   | "Access Control"
   | "Monitoring"
-  | "Account Security";
+  | "Account Security"
+  // Backend-supplied categories (e.g. "hardening") are preserved verbatim; the
+  // named values above stay as editor hints.
+  | (string & {});
 
 export type RecommendedAction = {
   id: string;
@@ -115,7 +118,14 @@ export type SecurityTicket = {
   confidence: number;
 
   affected_endpoint: string;
-  source: "log" | "pentagi" | "combined" | "lambda" | "fraud_sim" | "simulation";
+  source:
+    | "log"
+    | "pentagi"
+    | "combined"
+    | "lambda"
+    | "fraud_sim"
+    | "simulation"
+    | "agent-analyzer";
   source_ip?: string;
   actor_type: ActorType;
   user_id?: string;

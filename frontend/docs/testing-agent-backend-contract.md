@@ -1,8 +1,30 @@
-# Testing Agent Backend Contract
+# Testing Agent / Attacker App Backend Contract
 
 > How the Sandboxed Defender app talks to the collaborator backend that runs the
 > attack/fraud simulation agents (Bedrock / Lambda / custom). **Safe simulation
 > only** — `safe_mode` is always forced true; no real credentials/payment.
+
+## Stage 3 summary (read first)
+
+- The **browser only calls `/api/testing/launch`** (this app's own route). It
+  never calls the attacker app, AWS, or Bedrock directly.
+- That route reads the **server-side** API key and forwards to the attacker app.
+- Env vars (server-only; keys are **never** `NEXT_PUBLIC_`):
+  - `TESTING_AGENT_MODE` = `mock` | `external`
+  - `ATTACKER_APP_BASE_URL` (or legacy `TESTING_AGENT_BACKEND_URL`)
+  - `ATTACKER_APP_API_KEY` (or legacy `TESTING_AGENT_API_KEY`)
+- **Mock mode** works with no attacker app: the launch pages render a synthesized
+  `AttackerReport` (see `src/lib/attacker-report.types.ts`).
+- **External mode** requires `ATTACKER_APP_BASE_URL`; the bearer key is sent only
+  if configured. Missing URL → clean JSON error, no stack trace.
+- **Defender tickets come from the defender backend DB**, not from the attacker
+  report store. A report may reference tickets via `mapped_ticket_id` /
+  `linked_ticket_ids` once the backend records the matching verdict; until then
+  the panel shows "Defender tickets will appear once the backend records the
+  verdict."
+- If the attacker app returns a structured `report` in its launch response, the
+  launch pages render it as-is; otherwise the report is synthesized client-side
+  from the selected vector.
 
 ## Flow
 

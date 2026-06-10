@@ -16,11 +16,15 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { getVectorsByDomain } from "@/data/testingVectors";
 import { launchSimulation } from "@/lib/testing-launch.service";
+import { reportFromLaunchResult } from "@/lib/attacker-report.builder";
+import type { AttackerReport } from "@/lib/attacker-report.types";
 import type {
   SimulationDomain,
+  SimulationLaunchRequest,
   SimulationLaunchResponse,
   SimulationTargetType,
 } from "@/lib/testing-launch.types";
+import { AttackerReportPanel } from "@/components/reports/AttackerReportPanel";
 
 /**
  * Backend launch panel — the end-to-end launcher.
@@ -40,6 +44,7 @@ export function BackendLaunchPanel({ domain }: { domain: SimulationDomain }) {
   const [endpoint, setEndpoint] = useState("");
   const [launching, setLaunching] = useState(false);
   const [result, setResult] = useState<SimulationLaunchResponse | null>(null);
+  const [report, setReport] = useState<AttackerReport | null>(null);
   const [showCommand, setShowCommand] = useState(false);
 
   const selectedVector = vectors.find((v) => v.id === vectorId) ?? vectors[0];
@@ -50,8 +55,9 @@ export function BackendLaunchPanel({ domain }: { domain: SimulationDomain }) {
     if (!selectedVector || !baseUrl.trim()) return;
     setLaunching(true);
     setResult(null);
+    setReport(null);
 
-    const res = await launchSimulation({
+    const request: SimulationLaunchRequest = {
       domain,
       vector_id: selectedVector.id,
       target: {
@@ -61,9 +67,15 @@ export function BackendLaunchPanel({ domain }: { domain: SimulationDomain }) {
         environment: "local",
       },
       options: { safe_mode: true },
-    });
+    };
+
+    const res = await launchSimulation(request);
 
     setResult(res);
+    // Build a structured attacker report from the launch result (uses the
+    // collaborator backend's report if present, else synthesizes from the
+    // vector). Never creates defender tickets.
+    setReport(reportFromLaunchResult(request, selectedVector, res));
     setLaunching(false);
   }
 
@@ -179,10 +191,11 @@ export function BackendLaunchPanel({ domain }: { domain: SimulationDomain }) {
             </div>
             <p className="mt-2 text-xs text-foreground/90">{result.message}</p>
 
-            {result.ok && (
+            {result.ok && !report && (
               <p className="mt-2 text-xs text-muted-foreground">
-                Waiting for detection events… they sync into tickets within a few
-                seconds.
+                {domain === "fraud"
+                  ? "Fraud simulation launched. Waiting for attacker report or defender verdicts…"
+                  : "Simulation launched. Waiting for attacker report or defender verdicts…"}
               </p>
             )}
 
@@ -226,6 +239,10 @@ export function BackendLaunchPanel({ domain }: { domain: SimulationDomain }) {
             )}
           </div>
         )}
+
+        {/* Structured attacker/fraud report (MVP). Presentation only — does not
+            create defender tickets; those come from the defender backend. */}
+        {report && <AttackerReportPanel report={report} />}
       </CardContent>
     </Card>
   );

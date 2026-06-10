@@ -8,8 +8,9 @@
  *   4. mock mode  → synthesize a DetectionEvent, store it, return success
  *      external   → forward the AgentCommand to the collaborator backend
  *
- * Secrets (TESTING_AGENT_BACKEND_URL, TESTING_AGENT_API_KEY) are server-only.
- * The browser never talks to the collaborator backend / AWS directly.
+ * Secrets are server-only: ATTACKER_APP_BASE_URL / ATTACKER_APP_API_KEY (or the
+ * legacy TESTING_AGENT_BACKEND_URL / TESTING_AGENT_API_KEY). The browser never
+ * talks to the attacker app / AWS directly — it only calls this route.
  */
 import { NextResponse } from "next/server";
 import {
@@ -124,7 +125,9 @@ export async function POST(req: Request) {
   }
 
   // ── external mode ─────────────────────────────────────────
-  const backendUrl = process.env.TESTING_AGENT_BACKEND_URL;
+  // Prefer the newer ATTACKER_APP_* names; fall back to legacy TESTING_AGENT_*.
+  const backendUrl =
+    process.env.ATTACKER_APP_BASE_URL ?? process.env.TESTING_AGENT_BACKEND_URL;
   if (!backendUrl) {
     return NextResponse.json(
       {
@@ -133,7 +136,7 @@ export async function POST(req: Request) {
         status: "failed",
         provider: "collaborator_api",
         message:
-          "External mode is enabled but TESTING_AGENT_BACKEND_URL is not configured.",
+          "External mode is enabled but ATTACKER_APP_BASE_URL (or legacy TESTING_AGENT_BACKEND_URL) is not configured.",
         error: "backend_not_configured",
         command_preview: command,
       } satisfies SimulationLaunchResponse,
@@ -142,7 +145,8 @@ export async function POST(req: Request) {
   }
 
   const { provider } = getAgentForVector(vector);
-  const apiKey = process.env.TESTING_AGENT_API_KEY;
+  const apiKey =
+    process.env.ATTACKER_APP_API_KEY ?? process.env.TESTING_AGENT_API_KEY;
   const headers: Record<string, string> = {
     "content-type": "application/json",
   };

@@ -4,9 +4,8 @@ import { SecurityTicket } from "@/lib/ticket.types";
  * Seven connected mock tickets. Every ticket is fully populated so it renders
  * on both the queue table and the detail page.
  *
- * TODO(api): this file is the single source of truth for the mock data layer.
- * Replace consumption of MOCK_TICKETS in tickets.service.ts with real fetches;
- * keep this around as a storybook/fallback fixture.
+ * This is the seed for MOCK mode and the demo/simulation cache (the Zustand
+ * ticket store). Backend mode ignores it and reads the defender backend.
  */
 
 export const MOCK_TICKETS: SecurityTicket[] = [

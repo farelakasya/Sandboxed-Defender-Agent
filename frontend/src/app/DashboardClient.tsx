@@ -28,6 +28,7 @@ import {
 } from "@/lib/dashboard.utils";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardKPICards } from "@/components/dashboard/DashboardKPICards";
+import { BackendPostureStrip } from "@/components/dashboard/BackendPostureStrip";
 import { SeverityDonut } from "@/components/dashboard/SeverityDonut";
 import { AttackTypeDistribution } from "@/components/dashboard/AttackTypeDistribution";
 import { DetectionTypeDistribution } from "@/components/dashboard/DetectionTypeDistribution";
@@ -115,10 +116,22 @@ export function DashboardClient() {
           triggeredBy: [],
         }
       : queueHealth;
-    const backendPerIpDistribution = perIpBreakdown.map((row) => ({
-      attack_type: row.source_ip,
-      count: row.total_hits,
-    }));
+    // Annotate each attacker IP with a contained/blocked marker derived purely
+    // from backend data (no hardcoded IPs/counts). The red-team IP surfaces
+    // naturally as the dominant, fully-contained bar.
+    const backendPerIpDistribution = perIpBreakdown.map((row) => {
+      const fullyContained =
+        row.total_hits > 0 && row.contained === row.total_hits;
+      const marker = fullyContained
+        ? " · contained"
+        : row.ip_blocked
+          ? " · blocked"
+          : "";
+      return {
+        attack_type: `${row.source_ip}${marker}`,
+        count: row.total_hits,
+      };
+    });
 
     return {
       metrics,
@@ -157,6 +170,12 @@ export function DashboardClient() {
         metrics={derived.metrics}
         queueHealth={derived.queueHealth}
       />
+
+      {/* Richer backend aggregates (dismissed, flagged/blocked users, auto
+          notifications). Renders only when the backend supplies them. */}
+      {!mockMode && !backendUnavailable ? (
+        <BackendPostureStrip metrics={derived.metrics} />
+      ) : null}
 
       {/* Risk breakdown + attack types. items-start so the Attack Type card can
           grow when expanded without stretching Risk Breakdown to match. */}

@@ -5,6 +5,8 @@
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+# Vercel CLI local project metadata
+.vercel
 # Keep the template tracked even though the repo-root .gitignore ignores .env.*
 !.env.example
 .DS_Store

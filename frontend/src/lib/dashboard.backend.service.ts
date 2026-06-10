@@ -37,16 +37,37 @@ function queueHealthFromMetrics(metrics: DashboardMetrics): DashboardMetrics["qu
   return "Stable";
 }
 
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
+}
+
 export function normalizeBackendDashboardMetrics(rawValue: unknown): DashboardMetrics {
   const raw = asRecord(rawValue);
+  const blockedIpList = asStringArray(raw.blocked_ips);
+  const flaggedUsers = asStringArray(raw.flagged_users);
+
   const metrics: DashboardMetrics = {
     activeThreats: asNumber(raw.ongoing ?? raw.open_incidents),
     highRiskTickets: asNumber(raw.high_risk_tickets ?? raw.highRiskTickets),
     autoContained: asNumber(raw.contained ?? raw.auto_contained),
     needsReview: asNumber(raw.needs_review ?? raw.ongoing),
-    blockedIps: asNumber(raw.distinct_blocked_ips ?? raw.ip_blocked_count),
+    // Prefer a concrete blocked-IP list length, then explicit counts.
+    blockedIps:
+      blockedIpList.length ||
+      asNumber(raw.distinct_blocked_ips ?? raw.ip_blocked_count),
     queueHealth: "Stable",
     totalTickets: asNumber(raw.total_incidents ?? raw.total_reviewed),
+
+    // Richer aggregates surfaced on the dashboard.
+    dismissed: asNumber(raw.dismissed_count ?? raw.dismissed),
+    flaggedUsers:
+      flaggedUsers.length ||
+      asNumber(raw.distinct_flagged_users ?? raw.flagged_user_count),
+    blockedUsers: asNumber(raw.distinct_blocked_users ?? raw.user_blocked_count),
+    adminNotifications: asNumber(raw.admin_notifications),
+    blockedIpList,
   };
   metrics.queueHealth = queueHealthFromMetrics(metrics);
   return metrics;

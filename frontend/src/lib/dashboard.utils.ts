@@ -42,6 +42,18 @@ export interface DashboardMetrics {
   blockedIps: number;
   queueHealth: QueueHealth;
   totalTickets: number;
+
+  // === Richer backend aggregates (optional; present in backend mode) ===
+  /** Tickets dismissed / marked false positive. */
+  dismissed?: number;
+  /** Distinct users flagged by the defender. */
+  flaggedUsers?: number;
+  /** Distinct blocked users. */
+  blockedUsers?: number;
+  /** Count of automatic admin/on-call notifications fired. */
+  adminNotifications?: number;
+  /** Concrete blocked-IP list from the backend, if provided. */
+  blockedIpList?: string[];
 }
 
 /** Inputs to the queue-health calculation, all derived from the ticket store. */

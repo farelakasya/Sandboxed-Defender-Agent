@@ -1,3 +1,11 @@
+/**
+ * Legacy adapter: in-app Red/Blue sim events → SecurityTicket (used by the
+ * Zustand store's upsertTicketFromSimulation, mock/demo path only).
+ *
+ * CANONICAL path for new work is the unified detection-pipeline.ts
+ * (DetectionEvent → classify → analyze → ticket). Kept because the in-app
+ * simulator still emits the older SimulationIncidentEvent shape.
+ */
 import {
   AutomatedMeasure,
   DefenderAction,
