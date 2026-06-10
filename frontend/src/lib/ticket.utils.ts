@@ -148,9 +148,22 @@ export function getRiskScoreColor(score: number): string {
   return "text-emerald-400";
 }
 
+/**
+ * Display helper for backend-mode N/A rule: a missing/empty value renders as
+ * "N/A" rather than a fabricated default. Empty strings and empty arrays count
+ * as missing. Mock mode rarely hits this since the factory fills real values.
+ */
+export function displayOrNA(value: unknown): string {
+  if (value === null || value === undefined) return "N/A";
+  if (typeof value === "string" && value.trim() === "") return "N/A";
+  if (Array.isArray(value) && value.length === 0) return "N/A";
+  return String(value);
+}
+
 export function formatDateTime(value: string): string {
+  if (!value) return "N/A";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  if (Number.isNaN(d.getTime())) return "N/A";
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
     d.getUTCDate()
@@ -160,8 +173,9 @@ export function formatDateTime(value: string): string {
 }
 
 export function formatTime(value: string): string {
+  if (!value) return "N/A";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  if (Number.isNaN(d.getTime())) return "N/A";
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(
     d.getUTCSeconds()
@@ -194,8 +208,9 @@ export function getDetectedAtMs(t: SecurityTicket): number | null {
 
 /** Human "x minutes ago" relative time. */
 export function formatRelativeTime(value: string): string {
+  if (!value) return "N/A";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  if (Number.isNaN(d.getTime())) return "N/A";
   const diffMs = Date.now() - d.getTime();
   const sec = Math.round(diffMs / 1000);
   if (sec < 0) return "just now";

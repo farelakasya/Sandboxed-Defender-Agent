@@ -67,8 +67,10 @@ export function TicketQueueClient() {
   // Before hydration the store still holds the SSR seed; render against an empty
   // list to keep server/client markup consistent, then swap in real data.
   const mockTickets: SecurityTicket[] = hydrated ? tickets : [];
-  const data: SecurityTicket[] =
-    !mockMode ? (backendError ? mockTickets : backendTickets) : mockTickets;
+  // Backend mode shows ONLY backend tickets — never the mock store, even when
+  // the backend is unavailable (an error banner is shown instead). Mock mode
+  // uses the local store.
+  const data: SecurityTicket[] = mockMode ? mockTickets : backendTickets;
 
   // Map the active tab to a backend status filter where there's a 1:1 match.
   // Tabs without a direct status (p1_critical, grouped, suppressed) stay
@@ -293,7 +295,7 @@ export function TicketQueueClient() {
       {!mockMode && backendError && (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Backend unavailable — showing mock/local data. {backendError}
+            Backend unavailable — no defender tickets to display. {backendError}
           </span>
           <Button size="sm" variant="outline" onClick={() => loadBackendTickets(0)}>
             Retry

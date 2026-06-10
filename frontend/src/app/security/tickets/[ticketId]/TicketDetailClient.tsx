@@ -66,8 +66,9 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const storeTicket = useTicketStore((s) =>
     s.tickets.find((t) => t.ticket_id === ticketId)
   );
-  const ticket =
-    !mockMode && !backendError ? backendTicket : mockMode ? storeTicket : storeTicket;
+  // Backend mode renders ONLY the backend ticket (never the mock store). On a
+  // backend error `backendTicket` stays null and the error UI below takes over.
+  const ticket = mockMode ? storeTicket : backendTicket;
 
   // Store actions (stable references).
   const markResolved = useTicketStore((s) => s.markResolved);

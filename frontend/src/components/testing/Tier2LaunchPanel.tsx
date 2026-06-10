@@ -14,9 +14,11 @@ import {
 import {
   TERMINAL_STATUSES,
   type Scan,
+  type Scheme,
   type ScopeTarget,
 } from "@/lib/tier2-pentest.types";
 import { PentestScanPanel } from "@/components/reports/PentestScanPanel";
+import { RecentDefenderTickets } from "@/components/testing/RecentDefenderTickets";
 
 type TargetMode = "preset" | "custom";
 
@@ -30,8 +32,10 @@ const MAX_CONSECUTIVE_POLL_ERRORS = 5;
  */
 export function Tier2LaunchPanel() {
   const [ip, setIp] = useState("");
-  const [port, setPort] = useState("80");
+  const [port, setPort] = useState("443");
   const [endpoint, setEndpoint] = useState("/login");
+  // Scheme is part of the v2 contract; default https (the backend builds the URL).
+  const [scheme, setScheme] = useState<Scheme>("https");
   const [authorized, setAuthorized] = useState(false);
 
   // Preset attack targets from GET /scope. The dropdown toggles between using a
@@ -49,6 +53,9 @@ export function Tier2LaunchPanel() {
 
   const scanIdRef = useRef<string | null>(null);
   const pollErrorsRef = useRef(0);
+  // When the current scan was launched (ms) — used to flag recent defender
+  // tickets as POSSIBLE matches, never confirmed links.
+  const [launchedAtMs, setLaunchedAtMs] = useState<number | null>(null);
 
   const portNum = Number(port);
   const portValid = Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
@@ -99,6 +106,7 @@ export function Tier2LaunchPanel() {
           setSelectedPreset(targets[0].raw);
           setIp(targets[0].host);
           setPort(String(targets[0].port));
+          setScheme(targets[0].scheme);
         }
       } catch (e) {
         if (cancelled) return;
@@ -119,6 +127,7 @@ export function Tier2LaunchPanel() {
     if (target) {
       setIp(target.host);
       setPort(String(target.port));
+      setScheme(target.scheme);
     }
   }
 
@@ -136,11 +145,13 @@ export function Tier2LaunchPanel() {
     setPollError(null);
     setScan(null);
     pollErrorsRef.current = 0;
+    setLaunchedAtMs(Date.now());
     try {
       const res = await launchPentestScan({
         ip: ip.trim(),
         port: portNum,
         endpoint: endpoint.trim(),
+        scheme,
         authorized: true,
       });
       scanIdRef.current = res.scan_id;
@@ -149,7 +160,13 @@ export function Tier2LaunchPanel() {
         scan_id: res.scan_id,
         status: res.status,
         engine: null,
-        target: { ip: ip.trim(), port: portNum, endpoint: endpoint.trim(), url: "" },
+        target: {
+          ip: ip.trim(),
+          port: portNum,
+          endpoint: endpoint.trim(),
+          scheme,
+          url: "",
+        },
         profile: null,
         scenario: null,
         report_url: null,
@@ -300,23 +317,40 @@ export function Tier2LaunchPanel() {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Endpoint
-            </label>
-            <input
-              type="text"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              disabled={launching}
-              placeholder="/login"
-              className={`w-full rounded-lg border bg-background/40 px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary/40 disabled:opacity-50 ${
-                endpoint && !endpointValid ? "border-red-500/50" : "border-border"
-              }`}
-            />
-            {endpoint && !endpointValid && (
-              <p className="mt-1 text-xs text-red-400">Endpoint must start with “/”.</p>
-            )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Endpoint
+              </label>
+              <input
+                type="text"
+                value={endpoint}
+                onChange={(e) => setEndpoint(e.target.value)}
+                disabled={launching}
+                placeholder="/login"
+                className={`w-full rounded-lg border bg-background/40 px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary/40 disabled:opacity-50 ${
+                  endpoint && !endpointValid ? "border-red-500/50" : "border-border"
+                }`}
+              />
+              {endpoint && !endpointValid && (
+                <p className="mt-1 text-xs text-red-400">Endpoint must start with “/”.</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Scheme
+              </label>
+              <Select
+                className="h-[42px] w-full"
+                value={scheme}
+                onChange={(e) => setScheme(e.target.value as Scheme)}
+                disabled={launching}
+                aria-label="Scheme"
+              >
+                <option value="https">https</option>
+                <option value="http">http</option>
+              </Select>
+            </div>
           </div>
 
           <label className="flex items-start gap-2 text-xs text-foreground/90">
@@ -359,6 +393,16 @@ export function Tier2LaunchPanel() {
         <p className="text-center text-xs text-muted-foreground">
           Scan in progress — polling every 15s. You can leave this open.
         </p>
+      )}
+
+      {/* Defender-backend tickets (backend mode only). Possible related matches,
+          never confirmed links — the attacker backend has no ticket correlation. */}
+      {scan && (
+        <RecentDefenderTickets
+          target={{ ip: ip.trim(), endpoint: endpoint.trim() }}
+          refreshSignal={scan.status}
+          launchedAtMs={launchedAtMs ?? undefined}
+        />
       )}
     </div>
   );

@@ -97,7 +97,9 @@ export function EvidenceLogTable({ ticket }: { ticket: SecurityTicket }) {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                    No log entries match the current filters.
+                    {ticket.evidence_logs.length === 0
+                      ? "N/A — no evidence logs recorded."
+                      : "No log entries match the current filters."}
                   </td>
                 </tr>
               ) : (

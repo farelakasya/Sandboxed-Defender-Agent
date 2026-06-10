@@ -61,6 +61,11 @@ export function RecommendedActionsList({ actions, onToggleStatus }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {actions.length === 0 && (
+          <p className="text-sm italic text-muted-foreground/60">
+            N/A — no recommended actions provided.
+          </p>
+        )}
         {PRIORITY_ORDER.map((priority) => {
           const group = actions.filter((a) => a.priority === priority);
           if (group.length === 0) return null;

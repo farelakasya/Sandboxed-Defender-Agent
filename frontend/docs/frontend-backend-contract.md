@@ -53,13 +53,26 @@ Path mapping:
   on change; search / attack-type / endpoint / time-range stay client-side.
 - Response shape accepted: array, or `{ tickets|data|items, total, limit, offset }`.
 
-### Real ticket fields (no longer derived)
+### Real ticket fields — backend mode never fabricates (N/A rule)
 
-The backend now populates these from the DB; the normalizer prefers the explicit
-field and only derives as a fallback:
+The backend populates ticket fields from the DB. In **backend mode the
+normalizer (`tickets.backend.service.ts`) uses EXPLICIT backend fields only** —
+if a field is absent it is left empty/undefined and the UI shows **N/A**
+(`displayOrNA` / `NaOr` / `Na` in `ticket.utils.ts` + `components/tickets/
+Field.tsx`). It does **not** synthesize:
 `mitigation_actions`, `containment_status`, `developer_notification`,
-`recommended_fixes` (alias of `recommended_actions`). Timestamps are UTC `Z`
-(ISO offsets also parse correctly).
+`recommended_fixes`, `ai_analysis`/`analyzer_summary`, or any timestamp (no
+`new Date()` fallback). Timestamps are UTC `Z` (ISO offsets also parse).
+
+Allowed derived values (not fabrication): severity/findings counts, high-risk %
+from distribution counts, formatted timestamps, and status badge colors.
+
+Mock mode (`NEXT_PUBLIC_USE_MOCK_DATA=true`) still uses the local store/factory
+with full demo values; **backend mode never falls back to mock/store data** —
+the Ticket Queue and Ticket Detail show only backend tickets (an error banner is
+shown when the backend is unavailable, not mock data). The `DetectionEventSync`
+and `RedTeamEventSync` store bridges are **gated to mock mode** so backend mode
+is never polluted with synthetic tickets.
 
 Env:
 
@@ -69,33 +82,37 @@ DEFENDER_BACKEND_URL=http://54.84.126.64:8001   # server-only; proxy forwards he
 NEXT_PUBLIC_DEFENDER_API_BASE_URL=...    # optional: browser hits backend directly (debug)
 ```
 
-The backend normalizer (`tickets.backend.service.ts`) preserves:
-`recommended_actions`, `recommended_fixes`, `mitigation_actions`,
-`containment_status`, `analyzer_summary`, `ai_analysis`,
-`developer_notification`, and `source: "agent-analyzer"`.
-
-**Notifications are automatic.** The UI shows read-only status
-(`NotificationStatusCard`): `sent | pending | failed | not_required | unknown`,
-with fallback "Notification handled automatically by defender workflow." There
-is no manual "Notify Developer" action.
+**Notifications are read-only.** `NotificationStatusCard` shows the backend
+status (`sent | pending | failed | not_required`); when the backend returns no
+`developer_notification` object it shows **N/A** (no fabricated "handled
+automatically" status). There is no manual "Notify Developer" action.
 
 ## 2. Tier2 AI-Pentest backend — external, via proxy
 
-A single **async** AI-pentest backend. No fraud, no vector catalog, no domains,
-no synchronous report, no callbacks, no ticket correlation. The **browser only
-calls this app's routes** (`/api/testing/launch`, `/api/testing/scan/:id`); the
-proxy adds the API key server-side. The browser never calls the attacker backend
-or AWS directly.
+A single **async** AI-pentest backend (v2). No fraud, no vector catalog, no
+domains, no synchronous report, no callbacks, no ticket correlation. The
+**browser only calls this app's routes** (`/api/testing/scope`,
+`/api/testing/launch`, `/api/testing/scan/:id`); the proxy adds the API key
+server-side. The browser never calls the attacker backend or AWS directly.
 
 ```
-Browser → POST /api/testing/launch          { ip, port, endpoint, authorized:true }
-        → external: POST {BASE}{SCAN_PATH}   header x-api-key
+Browser → GET  /api/testing/scope           → external GET {BASE}{SCOPE_PATH}  header x-api-key
+        ← { scope: string[] }   // "host:port" presets (IP/hostname/CIDR)
+Browser → POST /api/testing/launch          { ip, port, endpoint, scheme, authorized:true }
+        → external POST {BASE}{SCAN_PATH}    header x-api-key
         ← 202 { scan_id, status:"QUEUED" }
 Browser → GET /api/testing/scan/:scan_id     (poll every ~15s, stop on terminal)
-        → external: GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
-        ← Scan { status, engine, target{url}, profile, scenario, report_url,
-                 error, created_at, findings[] }
+        → external GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
+        ← Scan { status, engine, target{ip,port,endpoint,scheme,url}, profile,
+                 scenario, report_url, error, created_at, findings[] }
 ```
+
+The attacker backend does **not** create defender tickets. After a scan the
+launch page may re-fetch `/api/defender/tickets` and show **possible** related
+tickets (endpoint/host + time heuristic) — never confirmed links. Scan
+findings/profile/scenario are shown only on the scan panel (`PentestScanPanel`),
+with **N/A** for any missing field; they are never converted into defender
+tickets.
 
 Env (server-only; **key never `NEXT_PUBLIC_`, never logged**):
 
@@ -103,6 +120,7 @@ Env (server-only; **key never `NEXT_PUBLIC_`, never logged**):
 TESTING_AGENT_MODE=mock                 # mock | external
 ATTACKER_APP_BASE_URL=                  # external requires this (incl. API GW stage)
 ATTACKER_APP_SCAN_PATH=/scan            # scan path; poll = {scan path}/{scan_id}
+ATTACKER_APP_SCOPE_PATH=/scope          # scope path → preset "host:port" targets
 ATTACKER_APP_API_KEY=                   # API key (sent as a header)
 ATTACKER_APP_AUTH_HEADER=x-api-key      # x-api-key (default, API GW) | bearer
 ```

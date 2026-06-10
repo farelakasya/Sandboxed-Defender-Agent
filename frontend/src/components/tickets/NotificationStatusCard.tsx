@@ -72,6 +72,26 @@ export function NotificationStatusCard({ ticket }: { ticket: SecurityTicket }) {
   const meta = STATUS_META[status];
   const Icon = meta.icon;
 
+  // Backend mode: no notification object means the backend reported none — show
+  // N/A rather than a fabricated "handled automatically" status.
+  if (!notification) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <BellRing className="size-4 text-primary" />
+            Notification Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm italic text-muted-foreground/60">
+            N/A — no developer notification reported.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>

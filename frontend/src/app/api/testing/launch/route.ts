@@ -33,6 +33,7 @@ type LaunchBody = {
   ip?: unknown;
   port?: unknown;
   endpoint?: unknown;
+  scheme?: unknown;
   authorized?: unknown;
 };
 
@@ -52,12 +53,19 @@ export async function POST(req: Request) {
   const ip = typeof body.ip === "string" ? body.ip.trim() : "";
   const port = typeof body.port === "number" ? body.port : Number(body.port);
   const endpoint = typeof body.endpoint === "string" ? body.endpoint.trim() : "";
+  // Optional scheme; default https when omitted. Only http|https allowed.
+  const rawScheme =
+    typeof body.scheme === "string" ? body.scheme.trim().toLowerCase() : "";
+  const scheme: "http" | "https" =
+    rawScheme === "http" ? "http" : rawScheme === "https" || !rawScheme ? "https" : "https";
 
   if (!ip) return err("`ip` is required.", "validation_error", 400);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     return err("`port` must be an integer 1–65535.", "validation_error", 400);
   if (!endpoint.startsWith("/"))
     return err("`endpoint` must start with '/'.", "validation_error", 400);
+  if (rawScheme && rawScheme !== "http" && rawScheme !== "https")
+    return err("`scheme` must be 'http' or 'https'.", "validation_error", 400);
   if (body.authorized !== true)
     return err(
       "`authorized` must be exactly true — you must confirm you are authorized to test this target.",
@@ -65,7 +73,7 @@ export async function POST(req: Request) {
       400
     );
 
-  const payload = { ip, port, endpoint, authorized: true as const };
+  const payload = { ip, port, endpoint, scheme, authorized: true as const };
 
   // ── mock mode ─────────────────────────────────────────────
   if (getMode() !== "external") {
