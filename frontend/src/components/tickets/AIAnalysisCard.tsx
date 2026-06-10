@@ -1,6 +1,7 @@
 import { Sparkles, Bot } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SecurityTicket } from "@/lib/ticket.types";
+import { NaOr } from "./Field";
 
 export function AIAnalysisCard({ ticket }: { ticket: SecurityTicket }) {
   return (
@@ -18,10 +19,10 @@ export function AIAnalysisCard({ ticket }: { ticket: SecurityTicket }) {
           </span>
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              {ticket.detected_by}
+              <NaOr value={ticket.detected_by} />
             </p>
             <p className="text-sm leading-relaxed text-foreground/90">
-              {ticket.ai_analysis}
+              <NaOr value={ticket.ai_analysis} />
             </p>
           </div>
         </div>

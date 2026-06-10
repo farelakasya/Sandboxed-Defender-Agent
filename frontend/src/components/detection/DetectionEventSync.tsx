@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useMockData } from "@/lib/api-client";
 import { useTicketStore } from "@/stores/ticket.store";
 import type { DetectionEvent } from "@/lib/detectionEvent.types";
 
@@ -47,10 +48,15 @@ function saveSeen(seen: Set<string>) {
 
 export function DetectionEventSync() {
   const { toast } = useToast();
+  const mockMode = useMockData();
   const importEvents = useTicketStore((s) => s.importDetectionEvents);
   const seenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // Backend mode: the defender backend is the only source of truth for
+    // tickets. This bridge synthesizes tickets into the local store from the
+    // in-memory detection pipeline, so it MUST stay off outside mock mode.
+    if (!mockMode) return;
     seenRef.current = loadSeen();
     let cancelled = false;
 
@@ -97,7 +103,7 @@ export function DetectionEventSync() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [importEvents, toast]);
+  }, [mockMode, importEvents, toast]);
 
   return null;
 }

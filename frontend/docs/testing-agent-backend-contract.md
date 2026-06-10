@@ -4,22 +4,25 @@
 > historical and describe the old multi-vector/fraud assumption that no longer
 > applies.**
 
-## Tier2 AI-Pentest backend (current)
+## Tier2 AI-Pentest backend v2 (current)
 
 A single async AI-pentest backend. **No** domains, vector catalog, fraud,
-synchronous report, callbacks, ticket correlation, options/max_steps/safe_mode.
-Opus chooses techniques at runtime.
+synchronous report, callbacks, ticket correlation, options/max_steps/
+max_attempts/safe_mode. Opus chooses techniques at runtime.
 
-**Flow:** launch a scan against an authorized target → get `scan_id` → poll
-until terminal. The browser only calls this app's routes; the proxy adds the API
-key server-side.
+**Flow:** read the allowlist (`/scope`) → launch a scan against an authorized
+target → get `scan_id` → poll until terminal. The browser only calls this app's
+routes; the proxy adds the API key server-side and the browser never touches the
+attacker backend / AWS directly.
 
 ```
-Browser → POST /api/testing/launch              { ip, port, endpoint, authorized:true }
-        → external: POST {ATTACKER_APP_BASE_URL}{ATTACKER_APP_SCAN_PATH}   header x-api-key
+Browser → GET  /api/testing/scope               → external GET  {BASE}{SCOPE_PATH}   header x-api-key
+        ← { scope: string[] }   // "host:port" presets (host may be IP/hostname/CIDR)
+Browser → POST /api/testing/launch              { ip, port, endpoint, scheme, authorized:true }
+        → external POST {BASE}{SCAN_PATH}        header x-api-key
         ← 202 { scan_id, status:"QUEUED" }
-Browser → GET /api/testing/scan/:scan_id        (poll every ~15s)
-        → external: GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
+Browser → GET  /api/testing/scan/:scan_id       (poll every ~15s)
+        → external GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
         ← Scan object (status QUEUED→RUNNING→DONE/FAILED/REJECTED)
 ```
 
@@ -29,24 +32,39 @@ Env (server-only; key never `NEXT_PUBLIC_`, never logged):
 TESTING_AGENT_MODE=external
 ATTACKER_APP_BASE_URL=https://r578qyt8l2.execute-api.us-east-1.amazonaws.com/prod
 ATTACKER_APP_SCAN_PATH=/scan
+ATTACKER_APP_SCOPE_PATH=/scope
 ATTACKER_APP_API_KEY=<set in env / Vercel only>
 ATTACKER_APP_AUTH_HEADER=x-api-key
 ```
 
-- **Launch body:** `{ ip: string, port: 1–65535, endpoint: "/...", authorized: true }`
-  (validated server-side; `authorized` must be exactly `true`).
-- **Scan object:** `scan_id, status, engine, target{ip,port,endpoint,url},
+- **`GET /scope`:** `{ "targets": ["54.84.126.64:80", "api.cashlo.id:443", "10.0.0.0/24"] }`.
+  The frontend proxy normalizes this to `{ scope: string[] }`. The launch UI
+  parses each `host:port` into a selectable preset (scheme inferred from the
+  port: 443/8443 → https); CIDR ranges aren't single launchable targets and are
+  skipped in the dropdown.
+- **Launch body:** `{ ip, port: 1–65535, endpoint: "/...", scheme: "http"|"https", authorized: true }`
+  (validated server-side; `scheme` optional, defaults `https`; `authorized` must
+  be exactly `true`). `ip` may be an IP **or** hostname. **Nothing else is sent** —
+  no domain/vector/options/max_steps/max_attempts/safe_mode/callback.
+- **Scan object:** `scan_id, status, engine, target{ip,port,endpoint,scheme,url},
   profile|null, scenario|null, report_url|null, error|null, created_at, findings[]`.
 - **Statuses:** `QUEUED | RUNNING | DONE | FAILED | REJECTED` (last three terminal).
 - **Polling:** every ~15s; stop on terminal; transient poll errors back off and
   keep the `scan_id` (run not lost).
 - **Severities:** lowercase (`critical|high|medium|low|info`).
-- **Targets:** backend builds `http://ip:port`; HTTPS targets unsupported. Targets
-  are allowlisted server-side; off-allowlist → `REJECTED`.
+- **Targets:** backend builds `{scheme}://{ip}:{port}{endpoint}`. Targets are
+  allowlisted server-side; off-allowlist → `REJECTED`.
 - **No fraud launch.** Defender fraud/anomaly data on the dashboard/tickets comes
   from the defender DB and is unrelated to this backend.
-- **No report→ticket correlation** (no `mapped_ticket_id` / `linked_ticket_ids` /
-  `defender_result`).
+- **No report→ticket correlation.** The attacker backend does NOT create defender
+  tickets and returns no `mapped_ticket_id` / `linked_ticket_ids` /
+  `defender_result`. The launch page may re-fetch the defender backend's recent
+  tickets after a scan and show them as **possible** related tickets (endpoint/
+  host + time heuristic) — never confirmed links. If the defender backend later
+  exposes a real `scan_id`/correlation field, switch to that.
+- **Scan findings are NOT defender verdicts.** Findings/profile/scenario are
+  rendered only on the launch/scan panel; they are never converted into defender
+  tickets or merged into ticket fields.
 - **Errors:** proxy returns clean JSON — `404 not_found`, `403 forbidden`,
   `400 validation_error`, `502` upstream — never the key, headers, or stack traces.
 

@@ -1,6 +1,6 @@
 import { Crosshair, Server, Bot, Gauge } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field } from "./Field";
+import { Field, NaOr } from "./Field";
 import { SecurityTicket } from "@/lib/ticket.types";
 import { formatSource, humanizeAttackType } from "@/lib/ticket.utils";
 
@@ -17,8 +17,14 @@ export function AttackSummaryCard({ ticket }: { ticket: SecurityTicket }) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          <Field label="Attack Type">{humanizeAttackType(ticket.attack_type)}</Field>
-          <Field label="Threat Category">{ticket.threat_category}</Field>
+          <Field label="Attack Type">
+            <NaOr value={ticket.attack_type}>
+              {humanizeAttackType(ticket.attack_type)}
+            </NaOr>
+          </Field>
+          <Field label="Threat Category">
+            <NaOr value={ticket.threat_category} />
+          </Field>
 
           <Field label="Confidence Score">
             <div className="flex items-center gap-2">
@@ -35,7 +41,7 @@ export function AttackSummaryCard({ ticket }: { ticket: SecurityTicket }) {
           <Field label="Affected Endpoint" mono>
             <span className="inline-flex items-center gap-1.5">
               <Server className="size-3.5 text-muted-foreground" />
-              {ticket.affected_endpoint}
+              <NaOr value={ticket.affected_endpoint} />
             </span>
           </Field>
 
@@ -45,17 +51,17 @@ export function AttackSummaryCard({ ticket }: { ticket: SecurityTicket }) {
           </Field>
 
           <Field label="User Agent" mono>
-            {ticket.user_agent ?? "—"}
+            <NaOr value={ticket.user_agent} />
           </Field>
           <Field label="Detected By">
             <span className="inline-flex items-center gap-1.5">
               <Bot className="size-3.5 text-primary" />
-              {ticket.detected_by}
+              <NaOr value={ticket.detected_by} />
             </span>
           </Field>
 
           <Field label="Detection Source" className="sm:col-span-2">
-            {ticket.detection_source}
+            <NaOr value={ticket.detection_source} />
           </Field>
         </div>
       </CardContent>

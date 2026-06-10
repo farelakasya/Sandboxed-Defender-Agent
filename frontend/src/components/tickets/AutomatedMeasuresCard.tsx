@@ -47,6 +47,11 @@ export function AutomatedMeasuresCard({ ticket }: { ticket: SecurityTicket }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {ticket.automated_measures.length === 0 ? (
+          <p className="text-sm italic text-muted-foreground/60">
+            N/A — no automated measures recorded.
+          </p>
+        ) : (
         <ol className="relative space-y-5">
           <span
             className="absolute left-[11px] top-1 h-[calc(100%-1.5rem)] w-px bg-border"
@@ -83,6 +88,7 @@ export function AutomatedMeasuresCard({ ticket }: { ticket: SecurityTicket }) {
             );
           })}
         </ol>
+        )}
       </CardContent>
     </Card>
   );

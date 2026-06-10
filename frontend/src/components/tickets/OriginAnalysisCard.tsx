@@ -1,6 +1,6 @@
 import { Globe, UserX, Fingerprint, Activity, Contact } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field } from "./Field";
+import { Field, NaOr } from "./Field";
 import { SecurityTicket } from "@/lib/ticket.types";
 import { formatActorType, formatDateTime } from "@/lib/ticket.utils";
 
@@ -28,7 +28,7 @@ export function OriginAnalysisCard({ ticket }: { ticket: SecurityTicket }) {
           <Field label="Matched Pattern">
             <span className="inline-flex items-center gap-1.5">
               <Fingerprint className="size-3.5 text-primary" />
-              {ticket.matched_pattern ?? "—"}
+              <NaOr value={ticket.matched_pattern} />
             </span>
           </Field>
           <Field label="Request Count">

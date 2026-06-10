@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useMockData } from "@/lib/api-client";
 import { useTicketStore } from "@/stores/ticket.store";
 import type { SimulationIncidentEvent } from "@/lib/redteam.types";
 
@@ -48,10 +49,15 @@ function saveSeen(seen: Set<string>) {
 
 export function RedTeamEventSync() {
   const { toast } = useToast();
+  const mockMode = useMockData();
   const importEvents = useTicketStore((s) => s.importRedTeamEvents);
   const seenRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // Backend mode: tickets come only from the defender backend. This bridge
+    // imports synthetic red-team tickets into the local store, so keep it off
+    // unless we're explicitly in mock mode.
+    if (!mockMode) return;
     seenRef.current = loadSeen();
     let cancelled = false;
 
@@ -99,7 +105,7 @@ export function RedTeamEventSync() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [importEvents, toast]);
+  }, [mockMode, importEvents, toast]);
 
   return null;
 }
