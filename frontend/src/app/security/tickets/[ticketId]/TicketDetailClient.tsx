@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { ShieldHalf, ArrowLeft, ShieldX } from "lucide-react";
-import { RecommendedAction } from "@/lib/ticket.types";
+import { useEffect, useState } from "react";
+import {
+  RecommendedAction,
+  SecurityTicket,
+  TicketActivityItem,
+} from "@/lib/ticket.types";
+import { useMockData } from "@/lib/api-client";
+import {
+  getTicketFromBackend,
+  updateTicketStatusOnBackend,
+} from "@/lib/tickets.backend.service";
 import { useTicketStore } from "@/stores/ticket.store";
 import { useHydrated } from "@/stores/useHydrated";
 import { useToast } from "@/components/ui/toast";
@@ -43,12 +53,20 @@ const BackLink = () => (
 export function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const { toast } = useToast();
   const hydrated = useHydrated();
+  const mockMode = useMockData();
+  const [backendTicket, setBackendTicket] = useState<SecurityTicket | null>(null);
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [backendNotFound, setBackendNotFound] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
 
   // Read the live ticket straight from the store; no local copy. Selecting by
   // id keeps this component subscribed to just this ticket's changes.
-  const ticket = useTicketStore((s) =>
+  const storeTicket = useTicketStore((s) =>
     s.tickets.find((t) => t.ticket_id === ticketId)
   );
+  const ticket =
+    !mockMode && !backendError ? backendTicket : mockMode ? storeTicket : storeTicket;
 
   // Store actions (stable references).
   const markResolved = useTicketStore((s) => s.markResolved);
@@ -59,9 +77,50 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
   );
   const addActivity = useTicketStore((s) => s.addActivity);
 
+  async function loadBackendTicket() {
+    if (mockMode) return;
+    setBackendLoading(true);
+    setBackendError(null);
+    setBackendNotFound(false);
+    try {
+      const loaded = await getTicketFromBackend(ticketId);
+      setBackendTicket(loaded);
+      setBackendNotFound(!loaded);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Backend unavailable.";
+      console.error("Ticket detail backend unavailable", err);
+      setBackendError(message);
+    } finally {
+      setBackendLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadBackendTicket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockMode, ticketId]);
+
+  async function updateBackendStatus(status: string, successTitle: string) {
+    setStatusUpdating(true);
+    try {
+      const updated = await updateTicketStatusOnBackend(ticketId, status);
+      setBackendTicket(updated);
+      toast({ variant: "success", title: successTitle, description: ticketId });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Status update failed.";
+      toast({
+        variant: "alert",
+        title: "Backend status update failed",
+        description: message,
+      });
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
+
   // Until the persisted store hydrates on the client, avoid asserting "not
   // found" (the SSR pass can't see localStorage).
-  if (!hydrated) {
+  if ((!mockMode && backendLoading && !backendTicket) || (mockMode && !hydrated)) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <BackLink />
@@ -72,7 +131,31 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
     );
   }
 
-  if (!ticket) {
+  if (!mockMode && backendError && !ticket) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <BackLink />
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-12 text-center">
+          <ShieldX className="size-8 text-muted-foreground" />
+          <div>
+            <p className="text-base font-semibold text-foreground">
+              Backend unavailable
+            </p>
+            <p className="text-sm text-muted-foreground">{backendError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={loadBackendTicket}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if ((!mockMode && backendNotFound) || !ticket) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <BackLink />
@@ -98,16 +181,28 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
   }
 
   function handleResolve() {
+    if (!mockMode) {
+      updateBackendStatus("resolved", "Ticket resolved");
+      return;
+    }
     markResolved(ticketId);
     toast({ variant: "success", title: "Ticket resolved", description: ticketId });
   }
 
   function handleReopen() {
+    if (!mockMode) {
+      updateBackendStatus("needs_review", "Ticket reopened");
+      return;
+    }
     reopenTicket(ticketId);
     toast({ title: "Ticket reopened", description: ticketId });
   }
 
   function handleNotify() {
+    if (!mockMode) {
+      updateBackendStatus("needs_review", "Developer notified");
+      return;
+    }
     notifyDeveloper(ticketId);
     toast({ variant: "alert", title: "Developer notified" });
   }
@@ -123,12 +218,21 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
     a.download = `${ticket.ticket_id}-report.json`;
     a.click();
     URL.revokeObjectURL(url);
-    addActivity(ticketId, {
+    const activityItem: TicketActivityItem = {
       id: `a-${Date.now()}`,
       timestamp: new Date().toISOString(),
       actor: "System",
       message: "Incident report exported (JSON).",
-    });
+    };
+    if (mockMode) {
+      addActivity(ticketId, activityItem);
+    } else {
+      setBackendTicket((current) =>
+        current
+          ? { ...current, activity: [...current.activity, activityItem] }
+          : current
+      );
+    }
     toast({ title: "Report exported", description: `${ticket.ticket_id}-report.json` });
   }
 
@@ -136,7 +240,21 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
     if (!ticket) return;
     const current = ticket.recommended_actions.find((a) => a.id === actionId);
     if (!current) return;
-    updateRecommendedActionStatus(ticketId, actionId, cycleStatus(current.status));
+    const next = cycleStatus(current.status);
+    if (mockMode) {
+      updateRecommendedActionStatus(ticketId, actionId, next);
+    } else {
+      setBackendTicket((currentTicket) =>
+        currentTicket
+          ? {
+              ...currentTicket,
+              recommended_actions: currentTicket.recommended_actions.map((a) =>
+                a.id === actionId ? { ...a, status: next } : a
+              ),
+            }
+          : currentTicket
+      );
+    }
   }
 
   return (
@@ -170,14 +288,23 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
             <TicketTimeline ticket={ticket} />
             <TicketActivity
               activity={ticket.activity}
-              onAddComment={(msg) =>
-                addActivity(ticketId, {
+              onAddComment={(msg) => {
+                const activityItem: TicketActivityItem = {
                   id: `a-${Date.now()}`,
                   timestamp: new Date().toISOString(),
                   actor: "Developer",
                   message: msg,
-                })
-              }
+                };
+                if (mockMode) {
+                  addActivity(ticketId, activityItem);
+                } else {
+                  setBackendTicket((current) =>
+                    current
+                      ? { ...current, activity: [...current.activity, activityItem] }
+                      : current
+                  );
+                }
+              }}
             />
           </div>
         </div>
@@ -192,7 +319,11 @@ export function TicketDetailClient({ ticketId }: { ticketId: string }) {
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Demo view · shared store · changes persist to localStorage.
+        {mockMode
+          ? "Demo view · shared store · changes persist to localStorage."
+          : statusUpdating
+            ? "Backend mode · updating ticket status…"
+            : "Backend mode · status changes persist through the API."}
       </p>
     </div>
   );

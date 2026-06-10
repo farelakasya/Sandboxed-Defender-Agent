@@ -1,11 +1,19 @@
 /**
  * Canonical ticket domain types for the Security Ticket Queue + Detail module.
  *
- * TODO(api): these mirror the eventual backend response shape. When the
- * incident API lands, generate/replace these from the backend contracts
- * (see ../../../src/contracts/incident.schema.ts in the Express service) and
- * keep the field names aligned so the data-access layer stays a thin mapper.
+ * Extended with optional unified detection fields so fraud simulations,
+ * attack simulations, Lambda/Bedrock findings, and production events all
+ * share the same SecurityTicket shape. Existing fields are unchanged;
+ * detection fields are optional and backward-compatible.
  */
+
+import type {
+  DetectionClassification,
+  DetectionMode,
+  DeveloperNotification,
+  FixRecommendation,
+  MitigationAction,
+} from "./detectionEvent.types";
 
 export type Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
@@ -28,6 +36,8 @@ export type DefenderAction =
   | "flag_user"
   | "notify_admin"
   | "notify_dev"
+  | "disable_account"
+  | "suspend_export"
   | "none";
 
 export type AutomatedMeasure = {
@@ -105,7 +115,7 @@ export type SecurityTicket = {
   confidence: number;
 
   affected_endpoint: string;
-  source: "log" | "pentagi" | "combined" | "lambda";
+  source: "log" | "pentagi" | "combined" | "lambda" | "fraud_sim" | "simulation";
   source_ip?: string;
   actor_type: ActorType;
   user_id?: string;
@@ -132,6 +142,23 @@ export type SecurityTicket = {
   is_grouped: boolean;
   grouped_event_count?: number;
   suppressed_event_count?: number;
+
+  // === Unified detection fields (optional, backward-compatible) ===
+
+  /** Multi-label detection classification (anomaly/attack/fraud combos). */
+  detection_classification?: DetectionClassification;
+  /** Mitigation actions taken by the system. */
+  mitigation_actions?: MitigationAction[];
+  /** Overall containment status. */
+  containment_status?: "contained" | "partial" | "not_contained" | "pending";
+  /** Developer notification status. */
+  developer_notification?: DeveloperNotification;
+  /** Structured fix recommendations from the analyzer. */
+  recommended_fixes?: FixRecommendation[];
+  /** AI/rule-based analyzer narrative. */
+  analyzer_summary?: string;
+  /** Whether this ticket originated from simulation or production. */
+  detection_mode?: DetectionMode;
 };
 
 /** Aggregate metrics surfaced in the queue KPI cards. */

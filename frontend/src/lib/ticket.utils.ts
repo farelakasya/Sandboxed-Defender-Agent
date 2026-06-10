@@ -273,6 +273,10 @@ export function formatDefenderAction(action: SecurityTicket["defender_action"]):
       return "Rate-limited IP";
     case "flag_user":
       return "Flagged user";
+    case "disable_account":
+      return "Disabled account";
+    case "suspend_export":
+      return "Suspended export";
     case "notify_admin":
       return "Notified admin";
     case "notify_dev":

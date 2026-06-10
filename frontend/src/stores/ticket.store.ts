@@ -31,6 +31,14 @@ import {
   normalizeSeverity,
   type ScanContext,
 } from "@/lib/redteam-finding-to-ticket.adapter";
+import { DetectionEvent } from "@/lib/detectionEvent.types";
+import {
+  analyzeDetectionEvent,
+  classifyDetectionEvent,
+  createDetectionTicket,
+  detectionDedupKey,
+  detectionDedupKeyForTicket,
+} from "@/lib/detection-pipeline";
 
 /**
  * Global client-side ticket store (demo MVP — no real database).
@@ -120,6 +128,23 @@ interface TicketState {
   importRedTeamFindings: (
     response: RedTeamScanResponse,
     context: ScanContext
+  ) => { createdCount: number; updatedCount: number };
+  /**
+   * Unified detection pipeline entry point. Runs classify → analyze → create/
+   * update on a DetectionEvent from ANY source (fraud sim, attack sim, Lambda,
+   * production). Dedups unresolved tickets by event_type + endpoint + source_ip.
+   * Returns the affected ticket and whether it was newly created.
+   */
+  importDetectionEvent: (
+    event: DetectionEvent
+  ) => { ticket: SecurityTicket; created: boolean };
+  /**
+   * Bulk-import DetectionEvents (used by the client polling bridge for events
+   * produced server-side by the launch route / collaborator callback). Returns
+   * created/updated counts.
+   */
+  importDetectionEvents: (
+    events: DetectionEvent[]
   ) => { createdCount: number; updatedCount: number };
   resetMockData: () => void;
 }
@@ -453,6 +478,76 @@ export const useTicketStore = create<TicketState>()(
           }
         }
 
+        return { createdCount, updatedCount };
+      },
+
+      // Unified detection pipeline: classify → analyze → create/update ticket.
+      // The single funnel for fraud sim, attack sim, Lambda findings, and
+      // (future) production events.
+      importDetectionEvent: (event) => {
+        const classification = classifyDetectionEvent(event);
+        const analysis = analyzeDetectionEvent(event, classification);
+        const key = detectionDedupKey(event);
+
+        // Find an existing UNRESOLVED ticket with the same dedup key.
+        const existing = get().tickets.find(
+          (t) =>
+            !RESOLVED_STATUSES.includes(t.status) &&
+            detectionDedupKeyForTicket(t) === key
+        );
+
+        if (existing) {
+          const ts = nowIso();
+          // Build a fresh ticket to harvest its evidence/measures, then merge
+          // onto the existing one (keep its id, bump counters/timestamps).
+          const fresh = createDetectionTicket(event, classification, analysis);
+          const updated: SecurityTicket = {
+            ...existing,
+            request_count: existing.request_count + 1,
+            last_seen: event.created_at,
+            updated_at: ts,
+            severity: classification.severity,
+            confidence: classification.confidence,
+            evidence_logs: [
+              ...existing.evidence_logs,
+              ...fresh.evidence_logs,
+            ],
+            // Refresh unified detection fields from the latest analysis.
+            detection_classification: classification,
+            mitigation_actions: analysis.mitigation_actions,
+            containment_status: fresh.containment_status,
+            developer_notification: analysis.developer_notification,
+            recommended_fixes: analysis.recommended_fixes,
+            analyzer_summary: analysis.summary,
+            activity: [
+              ...existing.activity,
+              makeActivity(
+                "AI Defender",
+                `Detection updated from ${event.source} (${classification.primary_type}).`
+              ),
+            ],
+          };
+          set((state) => ({
+            tickets: state.tickets.map((t) =>
+              t.ticket_id === existing.ticket_id ? updated : t
+            ),
+          }));
+          return { ticket: updated, created: false };
+        }
+
+        const created = createDetectionTicket(event, classification, analysis);
+        set((state) => ({ tickets: [created, ...state.tickets] }));
+        return { ticket: created, created: true };
+      },
+
+      importDetectionEvents: (events) => {
+        let createdCount = 0;
+        let updatedCount = 0;
+        for (const event of events) {
+          const { created } = get().importDetectionEvent(event);
+          if (created) createdCount += 1;
+          else updatedCount += 1;
+        }
         return { createdCount, updatedCount };
       },
 

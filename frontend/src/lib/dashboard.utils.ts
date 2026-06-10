@@ -5,6 +5,7 @@ import {
   Severity,
   TicketStatus,
 } from "./ticket.types";
+import type { DetectionType } from "./detectionEvent.types";
 
 /**
  * Pure derivation layer for the dashboard. Every number here is computed from
@@ -268,6 +269,8 @@ const DEFENSE_LABELS: Record<DefenderAction, string> = {
   block_ip: "IP Blocked",
   rate_limit_ip: "Rate Limited",
   flag_user: "Users Flagged",
+  disable_account: "Accounts Disabled",
+  suspend_export: "Exports Suspended",
   notify_admin: "Admin Notified",
   notify_dev: "Dev Notified",
   none: "No Action",
@@ -277,6 +280,8 @@ const DEFENSE_ORDER: DefenderAction[] = [
   "block_ip",
   "rate_limit_ip",
   "flag_user",
+  "disable_account",
+  "suspend_export",
   "notify_admin",
   "notify_dev",
   "none",
@@ -452,4 +457,61 @@ export function getRecommendedFixesSummary(
         PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
     )
     .slice(0, limit);
+}
+
+/* --------------------- detection-type distribution ------------------------ */
+
+export interface DetectionTypeCount {
+  type: DetectionType;
+  /** Tickets carrying this label (primary or secondary). */
+  count: number;
+}
+
+/** Count of tickets that are multi-label (≥2 detection types). */
+export interface DetectionTypeSummary {
+  byType: DetectionTypeCount[];
+  multiLabel: number;
+  classified: number;
+}
+
+const DETECTION_TYPE_ORDER: DetectionType[] = [
+  "attack",
+  "fraud",
+  "anomaly",
+  "normal",
+];
+
+/**
+ * Distribution of detection labels across tickets. Multi-label aware: a ticket
+ * classified as "fraud + attack + anomaly" increments all three. Tickets without
+ * a detection_classification are skipped (backward-compatible with legacy
+ * tickets), so this is safe to call on any ticket list.
+ */
+export function getDetectionTypeDistribution(
+  tickets: SecurityTicket[]
+): DetectionTypeSummary {
+  const counts = new Map<DetectionType, number>();
+  let multiLabel = 0;
+  let classified = 0;
+
+  for (const t of tickets) {
+    const c = t.detection_classification;
+    if (!c) continue;
+    classified += 1;
+    const labels = new Set<DetectionType>([
+      c.primary_type,
+      ...c.secondary_types,
+    ]);
+    if (labels.size >= 2) multiLabel += 1;
+    for (const label of labels) {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+
+  const byType = DETECTION_TYPE_ORDER.map((type) => ({
+    type,
+    count: counts.get(type) ?? 0,
+  })).filter((d) => d.count > 0);
+
+  return { byType, multiLabel, classified };
 }

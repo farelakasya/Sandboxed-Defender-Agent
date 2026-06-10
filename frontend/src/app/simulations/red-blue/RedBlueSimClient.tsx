@@ -26,6 +26,7 @@ import {
 import { SimulationAttackKey, SimulationIncidentEvent } from "@/lib/simulation.types";
 import { BedrockSetupCard } from "@/components/redteam/BedrockSetupCard";
 import { LambdaScanCard } from "@/components/redteam/LambdaScanCard";
+import { BackendLaunchPanel } from "@/components/testing/BackendLaunchPanel";
 
 interface LogLine {
   id: string;
@@ -179,6 +180,10 @@ export function RedBlueSimClient() {
           <Stat label="Tickets created" value={stats.tickets} tone="text-primary" />
         </div>
       </div>
+
+      {/* Unified backend launch — vector → /api/testing/launch → detection
+          events → tickets (mock or collaborator backend). */}
+      <BackendLaunchPanel domain="attack" />
 
       {/* Lambda Claude red-team scan — calls the server-side SigV4 proxy
           (/api/redteam/scan), imports findings into the ticket store. */}

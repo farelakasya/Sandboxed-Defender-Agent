@@ -10,8 +10,14 @@ const TOP_N = 5;
 
 export function AttackTypeDistribution({
   distribution,
+  title = "Attack Type Distribution",
+  emptyText = "No attacks recorded yet.",
+  formatLabel = humanizeAttackType,
 }: {
   distribution: AttackTypeCount[];
+  title?: string;
+  emptyText?: string;
+  formatLabel?: (value: string) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -26,13 +32,13 @@ export function AttackTypeDistribution({
       <CardHeader>
         <CardTitle>
           <TrendingUp className="size-4 text-primary" />
-          Attack Type Distribution
+          {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {sorted.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No attacks recorded yet.
+            {emptyText}
           </p>
         ) : (
           <>
@@ -48,7 +54,7 @@ export function AttackTypeDistribution({
                 <li key={d.attack_type} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-foreground">
-                      {humanizeAttackType(d.attack_type)}
+                      {formatLabel(d.attack_type)}
                     </span>
                     <span className="font-semibold tabular-nums text-muted-foreground">
                       {d.count}

@@ -63,6 +63,13 @@ export const NAV_SECTIONS: NavSection[] = [
         match: ["/simulations/red-blue"],
       },
       {
+        // In-app fraud simulator: feeds the unified detection pipeline.
+        label: "Fraud Simulation",
+        href: "/testing/fraud",
+        icon: CreditCard,
+        match: ["/testing/fraud"],
+      },
+      {
         // Teammate's original standalone HTML, served as-is from /public.
         label: "Red/Blue Simulation (raw)",
         href: "/red-blue-simulation.html",
@@ -70,8 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
         external: true,
       },
       {
-        // Teammate feature — static HTML served from /public.
-        label: "Fraud Simulation",
+        // Original fraud HTML — static, served from /public, kept untouched.
+        label: "Fraud Simulation (raw)",
         href: "/fraud-simulation.html",
         icon: CreditCard,
         external: true,

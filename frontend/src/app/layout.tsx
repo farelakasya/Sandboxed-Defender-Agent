@@ -3,6 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { RedTeamEventSync } from "@/components/redteam/RedTeamEventSync";
+import { DetectionEventSync } from "@/components/detection/DetectionEventSync";
 
 export const metadata: Metadata = {
   title: "Sandboxed Defender — Security Tickets",
@@ -24,6 +25,9 @@ export default function RootLayout({
           {/* Client polling bridge: imports server-side red-team events into the
               localStorage ticket store. Renders nothing. */}
           <RedTeamEventSync />
+          {/* Imports server-side detection events (launch route / collaborator
+              callback) into the ticket store. Renders nothing. */}
+          <DetectionEventSync />
           <div className="flex min-h-screen">
             <AppSidebar />
             <main className="min-w-0 flex-1">{children}</main>

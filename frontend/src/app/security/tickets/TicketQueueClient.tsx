@@ -5,6 +5,8 @@ import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QueueTab, SecurityTicket } from "@/lib/ticket.types";
 import { calculateQueueMetrics } from "@/lib/ticket.utils";
+import { useMockData } from "@/lib/api-client";
+import { getTicketPageFromBackend } from "@/lib/tickets.backend.service";
 import { useTicketStore } from "@/stores/ticket.store";
 import { useHydrated } from "@/stores/useHydrated";
 import { useToast } from "@/components/ui/toast";
@@ -36,9 +38,12 @@ const TIME_WINDOWS_MS: Record<QueueFilters["timeRange"], number | null> = {
   "7d": 604_800_000,
 };
 
+const BACKEND_PAGE_SIZE = 50;
+
 export function TicketQueueClient() {
   const { toast } = useToast();
   const hydrated = useHydrated();
+  const mockMode = useMockData();
 
   // Single source of truth: the shared store. No local copy of ticket data.
   const tickets = useTicketStore((s) => s.tickets);
@@ -52,10 +57,44 @@ export function TicketQueueClient() {
   const [overloadActive, setOverloadActive] = useState(false);
   const [suppressionEnabled, setSuppressionEnabled] = useState(true);
   const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+  const [backendTickets, setBackendTickets] = useState<SecurityTicket[]>([]);
+  const [backendTotal, setBackendTotal] = useState<number | undefined>();
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   // Before hydration the store still holds the SSR seed; render against an empty
   // list to keep server/client markup consistent, then swap in real data.
-  const data: SecurityTicket[] = hydrated ? tickets : [];
+  const mockTickets: SecurityTicket[] = hydrated ? tickets : [];
+  const data: SecurityTicket[] =
+    !mockMode ? (backendError ? mockTickets : backendTickets) : mockTickets;
+
+  async function loadBackendTickets(offset = 0) {
+    if (mockMode) return;
+    setBackendLoading(true);
+    setBackendError(null);
+    try {
+      const page = await getTicketPageFromBackend({
+        limit: BACKEND_PAGE_SIZE,
+        offset,
+      });
+      setBackendTickets((current) =>
+        offset === 0 ? page.tickets : [...current, ...page.tickets]
+      );
+      setBackendTotal(page.total);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Backend unavailable.";
+      console.error("Ticket backend unavailable", err);
+      setBackendError(message);
+    } finally {
+      setBackendLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (mockMode) return;
+    loadBackendTickets(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockMode]);
 
   const metrics = useMemo(() => calculateQueueMetrics(data), [data]);
 
@@ -153,6 +192,13 @@ export function TicketQueueClient() {
   }, [highlightedIds]);
 
   function handleSimulateNew() {
+    if (!mockMode) {
+      toast({
+        title: "Backend mode active",
+        description: "Set NEXT_PUBLIC_USE_MOCK_DATA=true to use demo simulations.",
+      });
+      return;
+    }
     const created = simulateNewTicket();
     if (!created) return;
     setHighlightedIds([created.ticket_id]);
@@ -165,6 +211,13 @@ export function TicketQueueClient() {
   }
 
   function handleSimulateOverload() {
+    if (!mockMode) {
+      toast({
+        title: "Backend mode active",
+        description: "Set NEXT_PUBLIC_USE_MOCK_DATA=true to use demo simulations.",
+      });
+      return;
+    }
     const campaign = simulateOverload();
     if (!campaign) return;
     setOverloadActive(true);
@@ -177,6 +230,10 @@ export function TicketQueueClient() {
   }
 
   function handleReset() {
+    if (!mockMode) {
+      loadBackendTickets(0);
+      return;
+    }
     resetMockData();
     setOverloadActive(false);
     setSuppressionEnabled(true);
@@ -197,7 +254,19 @@ export function TicketQueueClient() {
       <TicketQueueHeader
         onSimulateNew={handleSimulateNew}
         onSimulateOverload={handleSimulateOverload}
+        busy={backendLoading}
       />
+
+      {!mockMode && backendError && (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Backend unavailable — showing mock/local data. {backendError}
+          </span>
+          <Button size="sm" variant="outline" onClick={() => loadBackendTickets(0)}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       <TicketKPICards metrics={metrics} />
 
@@ -265,20 +334,40 @@ export function TicketQueueClient() {
       <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
         <span>
           Showing {visibleTickets.length} of {data.length} tickets
+          {!mockMode && backendTotal !== undefined ? ` loaded (${backendTotal} total)` : ""}
         </span>
         <div className="flex items-center gap-3">
           {!suppressionEnabled && (
             <span className="text-amber-400">Suppression disabled</span>
           )}
-          {/* Restore the original seed data for repeat demos. */}
           <Button size="sm" variant="ghost" onClick={handleReset}>
             <RotateCcw />
-            Reset Demo Data
+            {mockMode ? "Reset Demo Data" : "Refresh"}
           </Button>
         </div>
       </div>
 
+      {!mockMode && backendLoading && backendTickets.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+          Loading backend tickets…
+        </div>
+      )}
+
       <TicketTable tickets={visibleTickets} highlightedIds={highlightedIds} />
+
+      {!mockMode &&
+        !backendError &&
+        (backendTotal === undefined || backendTickets.length < backendTotal) && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => loadBackendTickets(backendTickets.length)}
+              disabled={backendLoading}
+            >
+              {backendLoading ? "Loading…" : "Load More"}
+            </Button>
+          </div>
+        )}
     </div>
   );
 }
