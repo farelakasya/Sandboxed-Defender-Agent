@@ -1,14 +1,20 @@
-import { AlertTriangle, Flame, ShieldCheck, Eye, Ban, Activity } from "lucide-react";
+import { AlertTriangle, Flame, ShieldCheck, Eye, Ban } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { DashboardMetrics } from "@/lib/dashboard.utils";
-import { QueueHealthBadge } from "./QueueHealthBadge";
+import { DashboardMetrics, QueueHealthResult } from "@/lib/dashboard.utils";
+import { QueueHealthCard } from "./QueueHealthCard";
 
 /**
  * Six product-focused KPIs. Intentionally NO "Developer Notifications" KPI —
  * dev notification is assumed to happen automatically for every ticket.
  */
-export function DashboardKPICards({ metrics }: { metrics: DashboardMetrics }) {
+export function DashboardKPICards({
+  metrics,
+  queueHealth,
+}: {
+  metrics: DashboardMetrics;
+  queueHealth: QueueHealthResult;
+}) {
   const cards = [
     {
       label: "Active Threats",
@@ -45,31 +51,21 @@ export function DashboardKPICards({ metrics }: { metrics: DashboardMetrics }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {cards.map(({ label, value, icon: Icon, tone }) => (
-        <Card key={label} className="p-4">
+        <Card key={label} className="flex h-[150px] flex-col justify-between p-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">
               {label}
             </span>
             <Icon className={cn("size-4", tone)} />
           </div>
-          <p className="mt-2 text-2xl font-bold tabular-nums text-foreground">
+          <p className="text-2xl font-bold tabular-nums text-foreground">
             {value}
           </p>
         </Card>
       ))}
 
-      {/* Queue Health as the sixth KPI — qualitative, not a raw count. */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">
-            Queue Health
-          </span>
-          <Activity className="size-4 text-emerald-400" />
-        </div>
-        <div className="mt-2.5">
-          <QueueHealthBadge health={metrics.queueHealth} />
-        </div>
-      </Card>
+      {/* Queue Health as the sixth KPI — qualitative, with explanation popover. */}
+      <QueueHealthCard health={queueHealth} />
     </div>
   );
 }

@@ -43,15 +43,151 @@ export interface DashboardMetrics {
   totalTickets: number;
 }
 
-export function getQueueHealth(tickets: SecurityTicket[]): QueueHealth {
-  const active = tickets.filter(isActive).length;
-  const suppressed = tickets.reduce(
-    (sum, t) => sum + (t.suppressed_event_count ?? 0),
-    0
+/** Inputs to the queue-health calculation, all derived from the ticket store. */
+export interface QueueHealthMetrics {
+  activeTickets: number;
+  highRiskTickets: number;
+  recentAttacks15m: number;
+  suppressedEvents: number;
+  groupedEvents: number;
+}
+
+export interface QueueHealthResult {
+  status: QueueHealth;
+  reason: string;
+  metrics: QueueHealthMetrics;
+  /** Human-readable list of every threshold currently breached. */
+  triggeredBy: string[];
+}
+
+/**
+ * Threshold table. Each metric has a Busy floor and an Overloaded floor. These
+ * are exported so the explanation popover can render the exact same numbers the
+ * logic uses (no drift between code and UI).
+ */
+export const QUEUE_HEALTH_THRESHOLDS = {
+  activeTickets: { busy: 20, overloaded: 50 },
+  highRiskTickets: { busy: 5, overloaded: 15 },
+  recentAttacks15m: { busy: 5, overloaded: 20 },
+  suppressedEvents: { busy: 50, overloaded: 150 },
+} as const;
+
+const RECENT_WINDOW_MS = 15 * 60 * 1000;
+
+/** Strongest-first reasons, used to pick the single headline reason. */
+const OVERLOADED_REASONS: Record<keyof typeof QUEUE_HEALTH_THRESHOLDS, string> = {
+  recentAttacks15m: "Attack spike detected",
+  suppressedEvents: "Suppressed duplicate events exceeded threshold",
+  highRiskTickets: "Too many high-risk tickets",
+  activeTickets: "Active ticket volume critically high",
+};
+const BUSY_REASONS: Record<keyof typeof QUEUE_HEALTH_THRESHOLDS, string> = {
+  recentAttacks15m: "Recent attack activity is rising",
+  highRiskTickets: "High-risk tickets need attention",
+  suppressedEvents: "Suppressed duplicate events are climbing",
+  activeTickets: "Elevated active ticket volume",
+};
+
+// Priority order for choosing the single headline reason.
+const REASON_PRIORITY: Array<keyof typeof QUEUE_HEALTH_THRESHOLDS> = [
+  "recentAttacks15m",
+  "suppressedEvents",
+  "highRiskTickets",
+  "activeTickets",
+];
+
+export function getQueueHealthMetrics(
+  tickets: SecurityTicket[]
+): QueueHealthMetrics {
+  const now = Date.now();
+  let suppressedEvents = 0;
+  let groupedEvents = 0;
+  let recentAttacks15m = 0;
+
+  for (const t of tickets) {
+    suppressedEvents += t.suppressed_event_count ?? 0;
+    groupedEvents += t.grouped_event_count ?? 0;
+    const created = new Date(t.created_at).getTime();
+    if (!Number.isNaN(created) && now - created <= RECENT_WINDOW_MS) {
+      recentAttacks15m += 1;
+    }
+  }
+
+  return {
+    activeTickets: tickets.filter(isActive).length,
+    highRiskTickets: tickets.filter((t) => isActive(t) && isHighRisk(t)).length,
+    recentAttacks15m,
+    suppressedEvents,
+    groupedEvents,
+  };
+}
+
+/**
+ * Calculate queue health from real ticket data.
+ *
+ *   Overloaded — any Overloaded threshold met (overrides Busy)
+ *   Busy       — any Busy threshold met (overrides Stable)
+ *   Stable     — none met
+ *
+ * The headline reason is the strongest breached threshold (attack spikes and
+ * suppression weigh highest). Empty store → Stable / "No active security tickets".
+ */
+export function calculateQueueHealth(
+  tickets: SecurityTicket[]
+): QueueHealthResult {
+  const metrics = getQueueHealthMetrics(tickets);
+
+  if (tickets.length === 0) {
+    return {
+      status: "Stable",
+      reason: "No active security tickets",
+      metrics,
+      triggeredBy: [],
+    };
+  }
+
+  const overloadedKeys = REASON_PRIORITY.filter(
+    (k) => metrics[k] >= QUEUE_HEALTH_THRESHOLDS[k].overloaded
   );
-  if (active >= 50 || suppressed > 100) return "Overloaded";
-  if (active >= 20) return "Busy";
-  return "Stable";
+  const busyKeys = REASON_PRIORITY.filter(
+    (k) => metrics[k] >= QUEUE_HEALTH_THRESHOLDS[k].busy
+  );
+
+  if (overloadedKeys.length > 0) {
+    const top = overloadedKeys[0];
+    return {
+      status: "Overloaded",
+      reason: OVERLOADED_REASONS[top],
+      metrics,
+      triggeredBy: overloadedKeys.map(
+        (k) => `${k} ≥ ${QUEUE_HEALTH_THRESHOLDS[k].overloaded}`
+      ),
+    };
+  }
+
+  if (busyKeys.length > 0) {
+    const top = busyKeys[0];
+    return {
+      status: "Busy",
+      reason: BUSY_REASONS[top],
+      metrics,
+      triggeredBy: busyKeys.map(
+        (k) => `${k} ≥ ${QUEUE_HEALTH_THRESHOLDS[k].busy}`
+      ),
+    };
+  }
+
+  return {
+    status: "Stable",
+    reason: "Queue volume is normal",
+    metrics,
+    triggeredBy: [],
+  };
+}
+
+/** Back-compat helper: just the status string. Delegates to calculateQueueHealth. */
+export function getQueueHealth(tickets: SecurityTicket[]): QueueHealth {
+  return calculateQueueHealth(tickets).status;
 }
 
 export function calculateDashboardMetrics(

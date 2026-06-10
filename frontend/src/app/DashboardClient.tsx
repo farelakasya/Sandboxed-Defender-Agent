@@ -6,6 +6,7 @@ import { useHydrated } from "@/stores/useHydrated";
 import { SecurityTicket } from "@/lib/ticket.types";
 import {
   calculateDashboardMetrics,
+  calculateQueueHealth,
   getSeverityDistribution,
   getHighRiskShareOfActive,
   getAttackTypeDistribution,
@@ -47,6 +48,7 @@ export function DashboardClient() {
   const derived = useMemo(() => {
     return {
       metrics: calculateDashboardMetrics(tickets),
+      queueHealth: calculateQueueHealth(tickets),
       severity: getSeverityDistribution(tickets),
       highRiskShare: getHighRiskShareOfActive(tickets),
       attackTypes: getAttackTypeDistribution(tickets),
@@ -60,12 +62,16 @@ export function DashboardClient() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
-      <DashboardHeader health={derived.metrics.queueHealth} />
+      <DashboardHeader health={derived.queueHealth.status} />
 
-      <DashboardKPICards metrics={derived.metrics} />
+      <DashboardKPICards
+        metrics={derived.metrics}
+        queueHealth={derived.queueHealth}
+      />
 
-      {/* Risk breakdown + attack types */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      {/* Risk breakdown + attack types. items-start so the Attack Type card can
+          grow when expanded without stretching Risk Breakdown to match. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
         <SeverityDonut
           distribution={derived.severity}
           total={derived.metrics.totalTickets}
