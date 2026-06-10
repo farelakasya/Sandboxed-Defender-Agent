@@ -5,4 +5,6 @@
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+# Keep the template tracked even though the repo-root .gitignore ignores .env.*
+!.env.example
 .DS_Store

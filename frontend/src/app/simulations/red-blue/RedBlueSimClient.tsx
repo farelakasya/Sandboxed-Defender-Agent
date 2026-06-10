@@ -24,6 +24,8 @@ import {
   runAgentTurn,
 } from "@/lib/simulation.engine";
 import { SimulationAttackKey, SimulationIncidentEvent } from "@/lib/simulation.types";
+import { BedrockSetupCard } from "@/components/redteam/BedrockSetupCard";
+import { LambdaScanCard } from "@/components/redteam/LambdaScanCard";
 
 interface LogLine {
   id: string;
@@ -178,12 +180,21 @@ export function RedBlueSimClient() {
         </div>
       </div>
 
+      {/* Lambda Claude red-team scan — calls the server-side SigV4 proxy
+          (/api/redteam/scan), imports findings into the ticket store. */}
+      <LambdaScanCard />
+
+      {/* Bedrock red-team setup — API-loaded attacker personas + dummy targets.
+          Separate, controlled pipeline that feeds the ticket store via the
+          RedTeamEventSync bridge. The in-app visual sim below is unchanged. */}
+      <BedrockSetupCard />
+
       {/* Controls */}
       <Card>
         <CardHeader>
           <CardTitle>
             <Swords className="size-4 text-primary" />
-            Configure run
+            Configure run (in-app visual sim)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

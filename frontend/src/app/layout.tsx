@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { RedTeamEventSync } from "@/components/redteam/RedTeamEventSync";
 
 export const metadata: Metadata = {
   title: "Sandboxed Defender — Security Tickets",
@@ -20,6 +21,9 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="min-h-screen bg-background bg-grid antialiased">
         <ToastProvider>
+          {/* Client polling bridge: imports server-side red-team events into the
+              localStorage ticket store. Renders nothing. */}
+          <RedTeamEventSync />
           <div className="flex min-h-screen">
             <AppSidebar />
             <main className="min-w-0 flex-1">{children}</main>

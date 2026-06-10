@@ -105,7 +105,7 @@ export type SecurityTicket = {
   confidence: number;
 
   affected_endpoint: string;
-  source: "log" | "pentagi" | "combined";
+  source: "log" | "pentagi" | "combined" | "lambda";
   source_ip?: string;
   actor_type: ActorType;
   user_id?: string;

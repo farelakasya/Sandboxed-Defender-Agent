@@ -16,6 +16,21 @@ import {
   dedupKeyForTicket,
   normalizeSimulationEventToTicket,
 } from "@/lib/simulation-to-ticket.adapter";
+import { SimulationIncidentEvent as RedTeamIncidentEvent } from "@/lib/redteam.types";
+import {
+  normalizeRedTeamEventToTicket,
+  redTeamDedupKey,
+  redTeamDedupKeyForTicket,
+  toEvidenceLogs,
+} from "@/lib/redteam-to-ticket.adapter";
+import { RedTeamScanResponse } from "@/lib/redteam-scan.types";
+import {
+  findingDedupKey,
+  findingDedupKeyForTicket,
+  normalizeFindingToTicket,
+  normalizeSeverity,
+  type ScanContext,
+} from "@/lib/redteam-finding-to-ticket.adapter";
 
 /**
  * Global client-side ticket store (demo MVP — no real database).
@@ -83,6 +98,29 @@ interface TicketState {
   upsertTicketFromSimulation: (
     event: SimulationIncidentEvent
   ) => { ticket: SecurityTicket; created: boolean };
+  /**
+   * Create or update a ticket from a Bedrock red-team SimulationIncidentEvent.
+   * Dedups against unresolved tickets by attack_type + affected_endpoint +
+   * source_ip. Appends evidence + bumps request_count on a match; otherwise
+   * creates a new ticket. Returns the affected ticket and whether it was new.
+   */
+  upsertTicketFromRedTeamEvent: (
+    event: RedTeamIncidentEvent
+  ) => { ticket: SecurityTicket; created: boolean };
+  /**
+   * Bulk-import Bedrock red-team events (used by the client polling bridge).
+   * Returns the number of tickets newly created.
+   */
+  importRedTeamEvents: (events: RedTeamIncidentEvent[]) => { createdCount: number };
+  /**
+   * Import findings from an AWS Lambda Claude red-team scan response. Converts
+   * each non-INFO finding to a SecurityTicket; dedups unresolved tickets by
+   * title + endpoint + (persona | run_id). Returns created/updated counts.
+   */
+  importRedTeamFindings: (
+    response: RedTeamScanResponse,
+    context: ScanContext
+  ) => { createdCount: number; updatedCount: number };
   resetMockData: () => void;
 }
 
@@ -305,6 +343,117 @@ export const useTicketStore = create<TicketState>()(
         const created = normalizeSimulationEventToTicket(event);
         set((state) => ({ tickets: [created, ...state.tickets] }));
         return { ticket: created, created: true };
+      },
+
+      // Bedrock red-team pipeline. Mirrors upsertTicketFromSimulation but for the
+      // richer RedTeamIncidentEvent shape.
+      // TODO(api): replace with a server-side normalize+upsert when the backend
+      // owns ticket persistence.
+      upsertTicketFromRedTeamEvent: (event) => {
+        const ts = nowIso();
+        const key = redTeamDedupKey(event);
+
+        const existing = get().tickets.find(
+          (t) =>
+            !RESOLVED_STATUSES.includes(t.status) &&
+            redTeamDedupKeyForTicket(t) === key
+        );
+
+        if (existing) {
+          const newEvidence = toEvidenceLogs(event);
+          const updated: SecurityTicket = {
+            ...existing,
+            request_count: existing.request_count + (newEvidence.length || 1),
+            last_seen: event.created_at,
+            updated_at: ts,
+            evidence_logs: [...existing.evidence_logs, ...newEvidence],
+            activity: [
+              ...existing.activity,
+              makeActivity(
+                "AI Defender",
+                "Ticket updated from Bedrock red-team attack."
+              ),
+            ],
+          };
+          set((state) => ({
+            tickets: state.tickets.map((t) =>
+              t.ticket_id === existing.ticket_id ? updated : t
+            ),
+          }));
+          return { ticket: updated, created: false };
+        }
+
+        const created = normalizeRedTeamEventToTicket(event);
+        set((state) => ({ tickets: [created, ...state.tickets] }));
+        return { ticket: created, created: true };
+      },
+
+      importRedTeamEvents: (events) => {
+        let createdCount = 0;
+        for (const event of events) {
+          const { created } = get().upsertTicketFromRedTeamEvent(event);
+          if (created) createdCount += 1;
+        }
+        return { createdCount };
+      },
+
+      // AWS Lambda Claude red-team scan → tickets.
+      // TODO(api): when the backend owns ticket persistence, this normalize +
+      // dedup should move server-side behind the scan response.
+      importRedTeamFindings: (response, context) => {
+        if (!response.ok || !response.findings) {
+          return { createdCount: 0, updatedCount: 0 };
+        }
+        const ts = nowIso();
+        let createdCount = 0;
+        let updatedCount = 0;
+
+        for (const finding of response.findings) {
+          // Skip pure-INFO findings (queue tracks actionable severities only).
+          if (normalizeSeverity(finding.severity) === "INFO") continue;
+
+          const key = findingDedupKey(finding, context);
+          const existing = get().tickets.find(
+            (t) =>
+              !RESOLVED_STATUSES.includes(t.status) &&
+              t.source === "lambda" &&
+              findingDedupKeyForTicket(t) === key
+          );
+
+          if (existing) {
+            const incoming = normalizeFindingToTicket(finding, context);
+            const updated: SecurityTicket = {
+              ...existing,
+              request_count:
+                existing.request_count + (incoming.evidence_logs.length || 1),
+              last_seen: ts,
+              updated_at: ts,
+              evidence_logs: [
+                ...existing.evidence_logs,
+                ...incoming.evidence_logs,
+              ],
+              activity: [
+                ...existing.activity,
+                makeActivity(
+                  "AI Defender",
+                  "Ticket updated from Lambda Claude red-team scan."
+                ),
+              ],
+            };
+            set((state) => ({
+              tickets: state.tickets.map((t) =>
+                t.ticket_id === existing.ticket_id ? updated : t
+              ),
+            }));
+            updatedCount += 1;
+          } else {
+            const created = normalizeFindingToTicket(finding, context);
+            set((state) => ({ tickets: [created, ...state.tickets] }));
+            createdCount += 1;
+          }
+        }
+
+        return { createdCount, updatedCount };
       },
 
       resetMockData: () =>

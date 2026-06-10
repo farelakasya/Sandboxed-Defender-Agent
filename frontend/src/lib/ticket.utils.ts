@@ -243,6 +243,8 @@ export function formatSource(source: SecurityTicket["source"]): string {
       return "PentAGI";
     case "combined":
       return "Combined";
+    case "lambda":
+      return "Lambda Scan";
     case "log":
     default:
       return "Log";
