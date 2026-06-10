@@ -79,65 +79,62 @@ The backend normalizer (`tickets.backend.service.ts`) preserves:
 with fallback "Notification handled automatically by defender workflow." There
 is no manual "Notify Developer" action.
 
-## 2. Attacker app — external, launched via proxy
+## 2. Tier2 AI-Pentest backend — external, via proxy
 
-The attacker app runs red-team / fraud agents. The **browser only calls
-`/api/testing/launch`** (this app's own route); that route adds the API key
-server-side and forwards to the attacker app. The browser never calls the
-attacker app, AWS, or Bedrock directly.
+A single **async** AI-pentest backend. No fraud, no vector catalog, no domains,
+no synchronous report, no callbacks, no ticket correlation. The **browser only
+calls this app's routes** (`/api/testing/launch`, `/api/testing/scan/:id`); the
+proxy adds the API key server-side. The browser never calls the attacker backend
+or AWS directly.
 
 ```
-Browser → POST /api/testing/launch
-        → (external) POST ${ATTACKER_APP_BASE_URL}${ATTACKER_APP_LAUNCH_PATH}
-          header: x-api-key: <key>   (or Authorization: Bearer, configurable)
+Browser → POST /api/testing/launch          { ip, port, endpoint, authorized:true }
+        → external: POST {BASE}{SCAN_PATH}   header x-api-key
+        ← 202 { scan_id, status:"QUEUED" }
+Browser → GET /api/testing/scan/:scan_id     (poll every ~15s, stop on terminal)
+        → external: GET  {BASE}{SCAN_PATH}/{scan_id}   header x-api-key
+        ← Scan { status, engine, target{url}, profile, scenario, report_url,
+                 error, created_at, findings[] }
 ```
 
-Env (server-only; **keys are never `NEXT_PUBLIC_`, never logged**):
+Env (server-only; **key never `NEXT_PUBLIC_`, never logged**):
 
 ```
 TESTING_AGENT_MODE=mock                 # mock | external
-ATTACKER_APP_BASE_URL=                  # external mode requires this (incl. API GW stage)
-ATTACKER_APP_LAUNCH_PATH=/launch        # path under the base (default /launch)
-ATTACKER_APP_API_KEY=                   # API key (optional; sent as a header)
+ATTACKER_APP_BASE_URL=                  # external requires this (incl. API GW stage)
+ATTACKER_APP_SCAN_PATH=/scan            # scan path; poll = {scan path}/{scan_id}
+ATTACKER_APP_API_KEY=                   # API key (sent as a header)
 ATTACKER_APP_AUTH_HEADER=x-api-key      # x-api-key (default, API GW) | bearer
-# legacy fallbacks: TESTING_AGENT_BACKEND_URL, TESTING_AGENT_API_KEY
 ```
 
-Real backend (set in Vercel env, key in Vercel only — do NOT use `NEXT_PUBLIC_API_KEY`):
+Real backend (set in Vercel env, key in Vercel only — never `NEXT_PUBLIC_API_KEY`):
 
 ```
 TESTING_AGENT_MODE=external
 ATTACKER_APP_BASE_URL=https://r578qyt8l2.execute-api.us-east-1.amazonaws.com/prod
-ATTACKER_APP_LAUNCH_PATH=/launch
+ATTACKER_APP_SCAN_PATH=/scan
 ATTACKER_APP_API_KEY=<set in Vercel only>
 ATTACKER_APP_AUTH_HEADER=x-api-key
 ```
 
-- **Mock mode** (`TESTING_AGENT_MODE=mock`): returns a synthetic report; no
-  attacker app needed.
-- **External mode** (`TESTING_AGENT_MODE=external`): requires
-  `ATTACKER_APP_BASE_URL`; missing → clean JSON error, no stack trace. On `404`
-  update `ATTACKER_APP_LAUNCH_PATH`; on `401/403` check `ATTACKER_APP_AUTH_HEADER`
-  and the key.
+- **Launch body:** `{ ip, port (1–65535), endpoint ("/..."), authorized:true }`
+  (validated server-side; `authorized` must be exactly `true`).
+- **Statuses:** `QUEUED | RUNNING | DONE | FAILED | REJECTED` (last three terminal).
+- **Polling:** every ~15s, stop on terminal; transient errors back off and keep
+  the `scan_id`. **Severities lowercase.** Targets are `http://ip:port` (HTTPS
+  unsupported); off-allowlist targets → `REJECTED`.
+- **Mock mode:** in-memory async scan (QUEUED→RUNNING→DONE with a sample profile,
+  scenario, and findings). No external backend needed.
+- **Errors:** clean JSON — `404 not_found`, `403 forbidden`, `400
+  validation_error`, `502` upstream — never the key/headers/stack traces.
 
-## 3. Report ↔ ticket relationship
+## 3. No fraud launch / no report↔ticket correlation
 
-- The **attacker report** (`AttackerReport`) is the immediate launch-side
-  output, rendered by `AttackerReportPanel`. It does **not** create tickets.
-- The **defender ticket** is the source-of-truth defender output from the
-  defender backend DB.
-- Linking happens when the attacker app / defender backend supplies
-  `mapped_ticket_id`, `linked_ticket_ids`, or run-correlation fields. The
-  correlation seam lives in `report-ticket-correlation.ts`
-  (`getLinkedTicketIdsFromReport`, `findPotentialTicketsForReport`,
-  `getReportTicketLinkStatus`). Until a link exists the panel shows:
-  "No linked defender ticket yet. Tickets will appear once the defender backend
-  records the verdict."
-
-## 4. Async run status (not yet implemented)
-
-External async runs currently show "Run started. Waiting for attacker report or
-defender verdicts." Polling is **not** implemented because no attacker-app
-status endpoint is confirmed. `attacker-run-status.types.ts` defines the generic
-shape (and `getRunStatusUrl`) to consume a poll URL **if** the attacker app
-returns one — we do not guess endpoint names.
+- **Fraud launch is not supported** by this backend. The Fraud Launch nav item is
+  hidden by default; its page shows an "unsupported" notice (the in-browser sim
+  stays for demos). Defender **fraud/anomaly tickets and dashboard labels come
+  from the defender DB** and are unrelated to attacker launches — they remain.
+- The Tier2 scan has **no** `mapped_ticket_id` / `linked_ticket_ids` /
+  `defender_result`. The pentest result (`PentestScanPanel`) is launch-side only
+  and never creates defender tickets. Findings render directly from the Scan
+  object; summary counts are derived from `findings` (not backend-provided).

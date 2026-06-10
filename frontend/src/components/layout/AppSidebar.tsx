@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShieldHalf, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, isNavItemActive, type NavItem } from "@/lib/nav";
+import {
+  getVisibleNavSections,
+  isNavItemActive,
+  type NavItem,
+} from "@/lib/nav";
 
 /**
  * Global app sidebar. Renders entirely from NAV_SECTIONS (see lib/nav.ts) so
@@ -13,6 +17,8 @@ import { NAV_SECTIONS, isNavItemActive, type NavItem } from "@/lib/nav";
  */
 export function AppSidebar() {
   const pathname = usePathname();
+  // Legacy/raw simulator sections are hidden unless the flag is enabled.
+  const sections = getVisibleNavSections();
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-border bg-card/50 lg:flex lg:flex-col">
@@ -28,7 +34,7 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-5 overflow-y-auto p-3">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.title} className="space-y-1">
             <p className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
               {section.title}

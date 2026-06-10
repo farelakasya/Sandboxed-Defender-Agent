@@ -110,6 +110,12 @@ export type SecurityTicket = {
 
   created_at: string;
   updated_at: string;
+  /**
+   * When the attack/detection happened (UTC ISO). Normalized from the first
+   * available backend field: detected_at > attack_timestamp > timestamp >
+   * created_at > updated_at. Optional so mock/adapter tickets stay valid.
+   */
+  detected_at?: string;
   first_seen: string;
   last_seen: string;
 

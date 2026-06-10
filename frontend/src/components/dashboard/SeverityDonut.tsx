@@ -26,8 +26,10 @@ const SEVERITY_COLOR: Record<Severity, string> = {
 
 interface Props {
   distribution: SeveritySlice[];
+  /** Donut total — the Detection Volume (sum of all severity buckets). */
   total: number;
-  highRiskShare: number;
+  /** % of verdicts that are high-risk (CRITICAL + HIGH), already computed. */
+  highRiskPct: number;
 }
 
 // Donut geometry. Normal/hover radii follow the requested 145/156 ratio
@@ -100,7 +102,7 @@ function DonutTooltip({
   );
 }
 
-export function SeverityDonut({ distribution, total, highRiskShare }: Props) {
+export function SeverityDonut({ distribution, total, highRiskPct }: Props) {
   // Shared hover state — driven by BOTH the slices and the legend rows.
   const [activeSeverity, setActiveSeverity] = useState<Severity | null>(null);
 
@@ -207,7 +209,7 @@ export function SeverityDonut({ distribution, total, highRiskShare }: Props) {
                     {total}
                   </span>
                   <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Total Tickets
+                    Verdicts
                   </span>
                 </>
               )}
@@ -265,8 +267,8 @@ export function SeverityDonut({ distribution, total, highRiskShare }: Props) {
         </div>
 
         <p className="mt-4 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{highRiskShare}%</span>{" "}
-          of active tickets are high-risk (CRITICAL or HIGH).
+          <span className="font-semibold text-foreground">{highRiskPct}%</span>{" "}
+          of defender verdicts are high-risk (CRITICAL or HIGH).
         </p>
       </CardContent>
     </Card>

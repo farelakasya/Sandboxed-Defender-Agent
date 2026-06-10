@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QueueTab, SecurityTicket } from "@/lib/ticket.types";
-import { calculateQueueMetrics } from "@/lib/ticket.utils";
+import { calculateQueueMetrics, getDetectedAtMs } from "@/lib/ticket.utils";
 import { useMockData } from "@/lib/api-client";
 import { getTicketPageFromBackend } from "@/lib/tickets.backend.service";
 import { useTicketStore } from "@/stores/ticket.store";
@@ -57,6 +57,8 @@ export function TicketQueueClient() {
   const [overloadActive, setOverloadActive] = useState(false);
   const [suppressionEnabled, setSuppressionEnabled] = useState(true);
   const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+  // Detected At sort direction; desc = newest first (default).
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [backendTickets, setBackendTickets] = useState<SecurityTicket[]>([]);
   const [backendTotal, setBackendTotal] = useState<number | undefined>();
   const [backendLoading, setBackendLoading] = useState(false);
@@ -94,7 +96,7 @@ export function TicketQueueClient() {
         status: backendStatus,
         severity: backendSeverity,
         sort: "created_at",
-        order: "desc",
+        order: sortOrder,
       });
       setBackendTickets((current) =>
         offset === 0 ? page.tickets : [...current, ...page.tickets]
@@ -109,12 +111,13 @@ export function TicketQueueClient() {
     }
   }
 
-  // Re-fetch from page 0 whenever the backend-relevant filters/tab change.
+  // Re-fetch from page 0 whenever the backend-relevant filters/tab/sort change
+  // (offset resets to 0 so pagination restarts under the new order).
   useEffect(() => {
     if (mockMode) return;
     loadBackendTickets(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mockMode, backendStatus, backendSeverity]);
+  }, [mockMode, backendStatus, backendSeverity, sortOrder]);
 
   const metrics = useMemo(() => calculateQueueMetrics(data), [data]);
 
@@ -176,11 +179,21 @@ export function TicketQueueClient() {
     return true;
   }
 
-  const visibleTickets = useMemo(
-    () => data.filter((t) => applyTab(t) && applyFilters(t)),
+  const visibleTickets = useMemo(() => {
+    const filtered = data.filter((t) => applyTab(t) && applyFilters(t));
+    // Sort by detection timestamp on the loaded set. In backend mode the
+    // server already orders pages; this keeps mock mode and client-side
+    // tabs/filters consistent. Tickets without a timestamp sort last.
+    return filtered.sort((a, b) => {
+      const aMs = getDetectedAtMs(a);
+      const bMs = getDetectedAtMs(b);
+      if (aMs === null && bMs === null) return 0;
+      if (aMs === null) return 1;
+      if (bMs === null) return -1;
+      return sortOrder === "desc" ? bMs - aMs : aMs - bMs;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, tab, filters]
-  );
+  }, [data, tab, filters, sortOrder]);
 
   const tabCounts = useMemo(() => {
     const counts: Record<QueueTab, number> = {
@@ -373,7 +386,14 @@ export function TicketQueueClient() {
         </div>
       )}
 
-      <TicketTable tickets={visibleTickets} highlightedIds={highlightedIds} />
+      <TicketTable
+        tickets={visibleTickets}
+        highlightedIds={highlightedIds}
+        sortOrder={sortOrder}
+        onToggleSort={() =>
+          setSortOrder((o) => (o === "desc" ? "asc" : "desc"))
+        }
+      />
 
       {!mockMode &&
         !backendError &&

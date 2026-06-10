@@ -26,7 +26,7 @@ import {
 import { SimulationAttackKey, SimulationIncidentEvent } from "@/lib/simulation.types";
 import { BedrockSetupCard } from "@/components/redteam/BedrockSetupCard";
 import { LambdaScanCard } from "@/components/redteam/LambdaScanCard";
-import { BackendLaunchPanel } from "@/components/testing/BackendLaunchPanel";
+import { Tier2LaunchPanel } from "@/components/testing/Tier2LaunchPanel";
 
 interface LogLine {
   id: string;
@@ -181,10 +181,16 @@ export function RedBlueSimClient() {
         </div>
       </div>
 
-      {/* Unified backend launch — vector → /api/testing/launch → detection
-          events → tickets (mock or collaborator backend). */}
-      <BackendLaunchPanel domain="attack" />
+      {/* Tier2 AI-Pentest launch — IP/port/endpoint → /api/testing/launch →
+          /scan (async); poll /api/testing/scan/:id until terminal. */}
+      <Tier2LaunchPanel />
 
+      {/* Hidden: Lambda Claude scan, Bedrock setup, and the in-app "Configure
+          run" visual sim. These are redundant now that pentesting is automated
+          via the Tier2 launch above. Kept in code (not deleted) so they can be
+          re-enabled if needed. */}
+      {false && (
+      <>
       {/* Lambda Claude red-team scan — calls the server-side SigV4 proxy
           (/api/redteam/scan), imports findings into the ticket store. */}
       <LambdaScanCard />
@@ -287,6 +293,8 @@ export function RedBlueSimClient() {
         In-app simulation · emits structured events · tickets persist to the
         shared store.
       </p>
+      </>
+      )}
     </div>
   );
 }

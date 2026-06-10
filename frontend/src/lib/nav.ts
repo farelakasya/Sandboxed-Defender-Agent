@@ -27,11 +27,23 @@ export interface NavItem {
   match?: string[];
   /** Served outside the Next router — render as a normal <a> (new tab). */
   external?: boolean;
+  /**
+   * Hidden from the navbar unless NEXT_PUBLIC_SHOW_LEGACY_SIMULATORS=true.
+   * Used for capabilities the current backend doesn't support (e.g. fraud
+   * launch). The route/page still exists; this only controls navbar visibility.
+   */
+  legacy?: boolean;
 }
 
 export interface NavSection {
   title: string;
   items: NavItem[];
+  /**
+   * Legacy/internal section — hidden from the primary navbar unless
+   * NEXT_PUBLIC_SHOW_LEGACY_SIMULATORS=true. The links/files still exist and
+   * the direct URLs remain accessible; this only controls navbar visibility.
+   */
+  legacy?: boolean;
 }
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -63,16 +75,19 @@ export const NAV_SECTIONS: NavSection[] = [
         match: ["/simulations/red-blue"],
       },
       {
-        // In-app fraud launcher: vector → /api/testing/launch → report.
+        // Fraud launch is NOT supported by the Tier2 AI-Pentest backend; hidden
+        // from the navbar by default (page still exists for the in-browser sim).
         label: "Fraud Launch",
         href: "/testing/fraud",
         icon: CreditCard,
         match: ["/testing/fraud"],
+        legacy: true,
       },
     ],
   },
   {
     title: "Legacy Simulators",
+    legacy: true,
     items: [
       {
         // Teammate's original standalone HTML, served as-is from /public.
@@ -91,6 +106,30 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/**
+ * Whether legacy/raw simulator sections should appear in the navbar.
+ * Controlled by NEXT_PUBLIC_SHOW_LEGACY_SIMULATORS (default: hidden).
+ * The raw HTML files and their direct URLs (e.g. /red-blue-simulation.html)
+ * stay accessible regardless — this only affects navbar visibility.
+ */
+export function showLegacySimulators(): boolean {
+  return process.env.NEXT_PUBLIC_SHOW_LEGACY_SIMULATORS === "true";
+}
+
+/**
+ * Nav sections to render in the sidebar. Legacy sections are dropped unless the
+ * flag is enabled. Use this (not NAV_SECTIONS) for rendering the navbar.
+ */
+export function getVisibleNavSections(): NavSection[] {
+  const showLegacy = showLegacySimulators();
+  return NAV_SECTIONS
+    // Drop whole legacy sections (e.g. Legacy Simulators) unless enabled.
+    .filter((s) => !s.legacy || showLegacy)
+    // Drop legacy items (e.g. Fraud Launch) unless enabled; drop now-empty sections.
+    .map((s) => ({ ...s, items: s.items.filter((i) => !i.legacy || showLegacy) }))
+    .filter((s) => s.items.length > 0);
+}
 
 /** Flat list, handy for tests or a future command palette. */
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
