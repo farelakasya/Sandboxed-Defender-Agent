@@ -19,6 +19,7 @@ import {
   Lock,
   ShieldAlert,
   ListChecks,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +55,6 @@ import { OwaspVulnerabilityReportModal } from "@/components/fraud/OwaspVulnerabi
 import { FixAuthFailuresModal } from "@/components/fraud/FixAuthFailuresModal";
 import { HardenCheckoutModal } from "@/components/fraud/HardenCheckoutModal";
 import { FraudDetectionRulesModal } from "@/components/fraud/FraudDetectionRulesModal";
-import { BackendLaunchPanel } from "@/components/testing/BackendLaunchPanel";
 
 interface LogLine {
   id: string;
@@ -286,8 +286,18 @@ export function FraudSimClient() {
         </div>
       </div>
 
-      {/* Backend launch — end-to-end vector → /api/testing/launch → tickets. */}
-      <BackendLaunchPanel domain="fraud" />
+      {/* Fraud launch is NOT supported by the Tier2 AI-Pentest backend. The
+          in-browser fraud sim below + defender fraud/anomaly tickets are
+          separate and remain. */}
+      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <Info className="mt-0.5 size-4 shrink-0" />
+        <p>
+          Fraud simulation is not supported by the current Tier2 AI-Pentest
+          backend. Use the in-browser fraud simulator below for demos. Defender
+          fraud/anomaly detections still appear on the dashboard and in tickets
+          from the defender database.
+        </p>
+      </div>
 
       {/* Controls — in-browser visual sim (kept). */}
       <Card>
