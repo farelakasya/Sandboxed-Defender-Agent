@@ -311,3 +311,18 @@ export async function getDashboardTimelineFromBackend(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Contract-named aliases (match the backend doc naming).
+// ---------------------------------------------------------------------------
+
+/** Alias of getDashboardDistributionsFromBackend. */
+export const getDefenderDashboardDistributions =
+  getDashboardDistributionsFromBackend;
+
+/** Alias of getDashboardTimelineFromBackend; accepts { limit }. */
+export function getDefenderDashboardTimeline(
+  opts: { limit?: number } = {}
+): Promise<DefenseFeedItem[] | null> {
+  return getDashboardTimelineFromBackend(opts.limit ?? 20);
+}

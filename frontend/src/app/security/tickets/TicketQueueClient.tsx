@@ -68,6 +68,21 @@ export function TicketQueueClient() {
   const data: SecurityTicket[] =
     !mockMode ? (backendError ? mockTickets : backendTickets) : mockTickets;
 
+  // Map the active tab to a backend status filter where there's a 1:1 match.
+  // Tabs without a direct status (p1_critical, grouped, suppressed) stay
+  // client-side only and send no status param.
+  function tabToBackendStatus(t: QueueTab): string | undefined {
+    if (t === "needs_review") return "needs_review";
+    if (t === "auto_contained") return "auto_contained";
+    return undefined;
+  }
+
+  // Server-side params derived from the UI. Filters the backend understands
+  // (status, severity, sort, order) are pushed down; the rest stay local.
+  const backendStatus =
+    filters.status !== "all" ? filters.status : tabToBackendStatus(tab);
+  const backendSeverity = filters.severity !== "all" ? filters.severity : undefined;
+
   async function loadBackendTickets(offset = 0) {
     if (mockMode) return;
     setBackendLoading(true);
@@ -76,6 +91,10 @@ export function TicketQueueClient() {
       const page = await getTicketPageFromBackend({
         limit: BACKEND_PAGE_SIZE,
         offset,
+        status: backendStatus,
+        severity: backendSeverity,
+        sort: "created_at",
+        order: "desc",
       });
       setBackendTickets((current) =>
         offset === 0 ? page.tickets : [...current, ...page.tickets]
@@ -90,11 +109,12 @@ export function TicketQueueClient() {
     }
   }
 
+  // Re-fetch from page 0 whenever the backend-relevant filters/tab change.
   useEffect(() => {
     if (mockMode) return;
     loadBackendTickets(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mockMode]);
+  }, [mockMode, backendStatus, backendSeverity]);
 
   const metrics = useMemo(() => calculateQueueMetrics(data), [data]);
 

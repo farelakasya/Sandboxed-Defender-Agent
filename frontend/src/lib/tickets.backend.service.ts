@@ -22,11 +22,24 @@ import type {
 type BackendTicketListResponse =
   | SecurityTicket[]
   | {
+      // Backend may key the array as tickets | data | items.
       tickets?: unknown[];
+      data?: unknown[];
+      items?: unknown[];
       total?: number;
       limit?: number;
       offset?: number;
     };
+
+/** Optional server-side filter/sort params for GET /api/tickets. */
+export type TicketQueryParams = {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  severity?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+};
 
 export type BackendTicketPage = {
   tickets: SecurityTicket[];
@@ -473,14 +486,28 @@ export async function getTicketsFromBackend(
 }
 
 export async function getTicketPageFromBackend(
-  params: { limit?: number; offset?: number } = {}
+  params: TicketQueryParams = {}
 ): Promise<BackendTicketPage> {
   const limit = params.limit ?? 50;
   const offset = params.offset ?? 0;
-  const data = await apiGet<BackendTicketListResponse>(
-    `/api/tickets?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
-  );
-  const rawTickets = Array.isArray(data) ? data : data.tickets ?? [];
+
+  // Build the query, including optional server-side filter/sort params. Only
+  // non-"all"/defined values are sent so the backend applies them.
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  qs.set("offset", String(offset));
+  if (params.status && params.status !== "all") qs.set("status", params.status);
+  if (params.severity && params.severity !== "all")
+    qs.set("severity", params.severity);
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.order) qs.set("order", params.order);
+
+  const data = await apiGet<BackendTicketListResponse>(`/api/tickets?${qs.toString()}`);
+
+  // Accept array, or object keyed by tickets | data | items.
+  const rawTickets = Array.isArray(data)
+    ? data
+    : data.tickets ?? data.data ?? data.items ?? [];
   return {
     tickets: rawTickets.map(normalizeBackendTicketToSecurityTicket),
     total: Array.isArray(data) ? undefined : data.total,
